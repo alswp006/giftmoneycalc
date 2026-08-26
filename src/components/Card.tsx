@@ -11,19 +11,25 @@ export function Card({
   children,
   style,
   testId,
+  onClick,
 }: {
   children: ReactNode;
   style?: CSSProperties;
   /** 레이아웃 테스트용 data-testid (예: getAllByTestId("strategy-card")) */
   testId?: string;
+  onClick?: () => void;
 }) {
   return (
     <div
       data-testid={testId}
+      onClick={onClick}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
       style={{
         padding: 16,
         borderRadius: 16,
         backgroundColor: "var(--adaptiveLayeredBackground)",
+        cursor: onClick ? "pointer" : undefined,
         ...style,
       }}
     >

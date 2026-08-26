@@ -167,6 +167,7 @@ export interface RouteState {
     Amount.tsx
     BottomCTA.tsx
     Card.tsx
+    ChipGroup.tsx
     CountUp.tsx
     FloatingTabBar.tsx
     MiniBar.tsx
@@ -174,6 +175,7 @@ export interface RouteState {
     ScreenScaffold.tsx
     Sparkline.tsx
     StateView.tsx
+    SubmitFooter.tsx
     SummaryHero.tsx
     TossPurchase.tsx
     TossRewardAd.tsx
@@ -184,6 +186,7 @@ export interface RouteState {
     constants.ts
     contract.ts
     format.ts
+    options.ts
     shareCard.ts
     stats.ts
     storage.ts
@@ -204,6 +207,7 @@ export interface RouteState {
 - constants.ts: export const EVENT_BASE: Record<EventType, number> =; export const RELATION_FACTOR: Record<RelationType, number> =; export const INTIMACY_FACTOR: Record<Intimacy, number> =; export const ATTENDANCE_FACTOR: Record<Attendance, number> =; export const REGION_FACTOR: Record<RegionType, number> =; export const AMOUNT_LADDER: number[] = [ 30000, 50000, 70000, 100000, 150000, 200000, 300000, 500000, 1000000, ]; export const EVENT_LABEL: Record<EventType, string> =; export const RELATION_LABEL: Record<RelationType, string> =
 - contract.ts: export type GiftRecord =; export type RecordType = 'gift' | 'received' | 'household'; export type CalcResult =; export type RouteState =; export type Settings =; export type RECORD_TYPES = Record<RecordType,; export type STORAGE_KEYS =; export type CALC_PARAMS =
 - format.ts: export function formatKRW(amount: number): string; export function formatAmountKrw(amount: number, opts?:; export function formatDate(date: string, format: "short" | "long" = "short"): string
+- options.ts: export interface SelectOption<T>; export const eventTypeOptions: SelectOption<EventType>[] = ( Object.keys(EVENT_LABEL) as EventType[] ).map((value) => (; export const relationOptions: SelectOption<RelationType>[] = ( Object.keys(RELATION_LABEL) as RelationType[] ).map((valu; export const intimacyOptions: SelectOption<Intimacy>[] = ( Object.keys(INTIMACY_LABEL).map(Number) as Intimacy[] ).map((; export const attendanceOptions: SelectOption<Attendance>[] = ( Object.keys(ATTENDANCE_LABEL) as Attendance[] ).map((valu; export const regionOptions: SelectOption<RegionType>[] = ( Object.keys(REGION_LABEL) as RegionType[] ).map((value) => (
 - shareCard.ts: export function drawShareCard(canvas: HTMLCanvasElement, result: CalcResult): void; export function buildShareText(result: CalcResult): string
 - stats.ts: export interface GiftStats; export function aggregateStats(records: GiftRecord[]): GiftStats
 - storage.ts: export function getRecords(): GiftRecord[]; export function addRecord( personName: string, eventType: EventType, relation: RelationType, amount: number, date: strin; export function deleteRecord(id: string): WriteResult; export function getSettings(): Settings; export function saveSettings(settings: Settings): WriteResult; export function getLastCalc(): LastCalc | null; export function saveLastCalc(lastCalc: LastCalc): WriteResult; export function getRewardUnlock(): RewardUnlock
@@ -215,6 +219,7 @@ export interface RouteState {
 - Amount.tsx: Amount
 - BottomCTA.tsx: SubmitFooter, ButtonStack
 - Card.tsx: Card
+- ChipGroup.tsx: ChipGroup
 - CountUp.tsx: CountUp
 - FloatingTabBar.tsx: FloatingTabBar
 - MiniBar.tsx: MiniBar
@@ -222,6 +227,7 @@ export interface RouteState {
 - ScreenScaffold.tsx: ScreenScaffold
 - Sparkline.tsx: Sparkline
 - StateView.tsx: EmptyState, LoadingState
+- SubmitFooter.tsx: SubmitFooter
 - SummaryHero.tsx: SummaryHero
 - TossPurchase.tsx: TossPurchase
 - TossRewardAd.tsx: TossRewardAd
@@ -229,6 +235,7 @@ export interface RouteState {
 ### Module Dependencies (import graph)
   lib/calc.ts → imports: lib/constants, lib/format, lib/types
   lib/constants.ts → imports: lib/types
+  lib/options.ts → imports: lib/types, lib/constants
   lib/shareCard.ts → imports: lib/constants, lib/format, lib/types
   lib/stats.ts → imports: lib/types
   lib/storage.ts → imports: lib/types, lib/constants

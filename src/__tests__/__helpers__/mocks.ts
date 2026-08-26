@@ -146,12 +146,8 @@ export function mockTds() {
       { Header: ({ children }: any) => React.createElement("div", null, children) },
     ),
 
-    Chip: ({ children, selected, onClick }: any) =>
-      React.createElement(
-        "button",
-        { role: "button", "aria-pressed": selected, onClick },
-        children,
-      ),
+    Chip: ({ children, onClick, ...props }: any) =>
+      React.createElement("button", { role: "button", onClick, ...props }, children),
 
     Switch: ({ checked, onChange }: any) =>
       React.createElement("input", { type: "checkbox", checked, onChange, role: "switch" }),

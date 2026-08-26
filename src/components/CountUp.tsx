@@ -40,9 +40,12 @@ export function CountUp({
       return;
     }
 
-    const start = performance.now();
+    // start를 첫 rAF 콜백의 now에서 잡는다 — performance.now()와 rAF now는
+    // 환경(jsdom rAF shim, fake timers 등)에 따라 서로 다른 시계일 수 있어 섞으면 어긋난다.
+    let start: number | null = null;
     const tick = (now: number) => {
-      const p = Math.min(1, (now - start) / durationMs);
+      if (start === null) start = now;
+      const p = Math.min(1, Math.max(0, (now - start) / durationMs));
       const eased = 1 - Math.pow(1 - p, 3); // easeOutCubic
       setDisplay(Math.round(value * eased));
       if (p < 1) raf.current = requestAnimationFrame(tick);

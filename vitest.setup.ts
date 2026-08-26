@@ -7,10 +7,18 @@
  *  - Canvas 2D context shim for jsdom (needed for canvas rendering utilities)
  *  - sessionStorage isolation
  *  - console.error filtering (React Router warnings etc.)
+ *  - Node's native URL restored as global (jsdom's own URL polyfill mishandles
+ *    "file://" bases for relative resolution — needed alongside the
+ *    skip-asset-url-transform-in-tests vite plugin for `new URL(rel, import.meta.url)`
+ *    file-reading patterns in tests)
  */
 
 import { beforeEach, afterEach, vi } from "vitest";
+import { URL as NodeURL, URLSearchParams as NodeURLSearchParams } from "node:url";
 import "@testing-library/jest-dom/vitest";
+
+globalThis.URL = NodeURL as unknown as typeof globalThis.URL;
+globalThis.URLSearchParams = NodeURLSearchParams as unknown as typeof globalThis.URLSearchParams;
 
 // ── localStorage / sessionStorage isolation ──
 // jsdom's storage persists between tests by default. Clear it to prevent pollution.

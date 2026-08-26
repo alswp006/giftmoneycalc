@@ -24,6 +24,7 @@ export function SummaryHero({
   action,
   ai,
   testId,
+  onClick,
 }: {
   label: ReactNode;
   /** 보통 <Amount .../> 또는 강조 텍스트(typography t1~t2) */
@@ -34,9 +35,11 @@ export function SummaryHero({
   /** AI 생성 결과면 true → "AI가 생성한 결과입니다" 라벨 표시(고지 의무) */
   ai?: boolean;
   testId?: string;
+  /** 카드 전체를 탭 가능하게 만든다(상세 화면 이동 등). */
+  onClick?: () => void;
 }) {
   return (
-    <Card testId={testId}>
+    <Card testId={testId} onClick={onClick}>
       <Paragraph.Text typography="st11">{label}</Paragraph.Text>
       <Spacing size={4} />
       {/* value는 자체 typography를 가진다(<Amount typography="t1"/> 또는 Paragraph.Text). 중첩 금지. */}
