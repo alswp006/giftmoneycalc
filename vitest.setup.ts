@@ -4,6 +4,7 @@
  * Handles:
  *  - localStorage isolation between tests (prevents cross-test pollution)
  *  - requestAnimationFrame shim for jsdom (needed for animate/countup utilities)
+ *  - Canvas 2D context shim for jsdom (needed for canvas rendering utilities)
  *  - sessionStorage isolation
  *  - console.error filtering (React Router warnings etc.)
  */
@@ -28,6 +29,51 @@ if (typeof globalThis.requestAnimationFrame !== "function") {
     return setTimeout(() => cb(now), 0) as unknown as number;
   }) as typeof globalThis.requestAnimationFrame;
   globalThis.cancelAnimationFrame = ((id: number) => clearTimeout(id)) as typeof globalThis.cancelAnimationFrame;
+}
+
+// ── Canvas 2D context shim for jsdom ──
+// jsdom does NOT implement canvas rendering natively (requires the native "canvas"
+// package). Stub a minimal 2D context so canvas-drawing utilities are testable.
+if (typeof HTMLCanvasElement !== "undefined") {
+  const fakeContexts = new WeakMap<HTMLCanvasElement, object>();
+  HTMLCanvasElement.prototype.getContext = function (contextId: string) {
+    if (contextId !== "2d") return null;
+    const existing = fakeContexts.get(this);
+    if (existing) return existing;
+    const ctx = {
+      fillStyle: "",
+      strokeStyle: "",
+      font: "",
+      textAlign: "start",
+      textBaseline: "alphabetic",
+      lineWidth: 1,
+      globalAlpha: 1,
+      fillRect: () => {},
+      clearRect: () => {},
+      strokeRect: () => {},
+      fillText: () => {},
+      strokeText: () => {},
+      measureText: () => ({ width: 0 }),
+      beginPath: () => {},
+      closePath: () => {},
+      moveTo: () => {},
+      lineTo: () => {},
+      arc: () => {},
+      fill: () => {},
+      stroke: () => {},
+      save: () => {},
+      restore: () => {},
+      translate: () => {},
+      scale: () => {},
+      rotate: () => {},
+      drawImage: () => {},
+      createLinearGradient: () => ({ addColorStop: () => {} }),
+      setLineDash: () => {},
+      roundRect: () => {},
+    };
+    fakeContexts.set(this, ctx);
+    return ctx;
+  } as unknown as typeof HTMLCanvasElement.prototype.getContext;
 }
 
 // ── afterEach reset ──
