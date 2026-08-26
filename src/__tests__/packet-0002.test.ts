@@ -1,4 +1,11 @@
 import { describe, it, expect } from 'vitest';
+import * as constants from '@/lib/constants';
+
+// NOTE: vite-node wires the in-test `require()` to Node's real createRequire,
+// which cannot resolve the `@` alias or `.ts` extensions — so `require('@/lib/constants')`
+// never resolves regardless of what constants.ts exports. Use the static import above instead.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const require = (_id: string): any => constants;
 
 /**
  * Packet 0002: 계수·라벨·스토리지 상수 테이블
