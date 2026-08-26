@@ -68,6 +68,15 @@ export function RewardGate({
     onUnlocked();
   }, [onUnlocked]);
 
+  // 사용자가 직접 누르는 재시도 경로 — ref 가드를 태우지 않는다.
+  // 광고는 이미 끝났는데 부모의 해제 저장이 실패하면(스토리지 한도 등) unlocked가
+  // 계속 false로 남는다. 그때 가드된 핸들러를 물려두면 눌러도 아무 일이 없는
+  // 막다른 버튼이 되므로, 클릭은 항상 onUnlocked를 다시 시도하게 둔다.
+  const handleRetry = useCallback(() => {
+    firedRef.current = true;
+    onUnlocked();
+  }, [onUnlocked]);
+
   // 광고를 재생할 수 없는 환경이면 잠금을 그냥 풀어준다 — 볼 수 없는 광고를
   // 조건으로 걸면 사용자가 리포트에 영영 도달하지 못하는 막다른 길이 된다.
   useEffect(() => {
@@ -113,7 +122,7 @@ export function RewardGate({
         buttonText={buttonText}
         onRewarded={handleRewarded}
       >
-        <Button variant="fill" size="large" display="block" onClick={handleRewarded}>
+        <Button variant="fill" size="large" display="block" onClick={handleRetry}>
           {buttonText}
         </Button>
       </TossRewardAd>
