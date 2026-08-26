@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react';
+
 /**
  * 패킷 간 인터페이스 계약 — 자동 생성. **수정하지 마라.**
  *
@@ -6,7 +8,7 @@
  */
 
 /** 기본 기록 엔티티 — 모든 페이지에서 참조 (구현: 패킷 0001) */
-export type Record = { id: string; type: RecordType; recipientId: string; amountKrw: number; date: string; occasion?: string };
+export type GiftRecord = { id: string; type: RecordType; recipientId: string; amountKrw: number; date: string; occasion?: string };
 
 /** 기록 유형 enum — 계산·필터링·라벨링 (구현: 패킷 0001) */
 export type RecordType = 'gift' | 'received' | 'household';
@@ -15,7 +17,7 @@ export type RecordType = 'gift' | 'received' | 'household';
 export type CalcResult = { amountKrw: number; reason: string; sourceTable: string };
 
 /** 페이지 간 라우트 상태 전달 — 계산→결과 흐름 (구현: 패킷 0001) */
-export type RouteState = { recordType?: RecordType; recipientId?: string; calcResult?: CalcResult };
+export type RouteState = { recordType?: RecordType; recipientId?: string; calcResult?: CalcResult; giftRecord?: GiftRecord };
 
 /** 사용자 설정 스키마 — 0015(Settings)에서 수정 (구현: 패킷 0005) */
 export type Settings = { defaultLocale: string; listDensity: 'compact' | 'normal'; hideAds?: boolean };
@@ -39,10 +41,10 @@ export type formatAmountKrwFn = (amount: number, opts?: { short?: boolean }) => 
 export type formatDateFn = (date: string, format?: 'short' | 'long') => string;
 
 /** 전역 스토리지 훅 — 모든 페이지의 상태 접근 (구현: 패킷 0005) */
-export type useStorageFn = () => { records: Record[]; addRecord(r: Record): void; deleteRecord(id: string): void; settings: Settings };
+export type useStorageFn = () => { records: GiftRecord[]; addRecord(r: GiftRecord): void; deleteRecord(id: string): void; settings: Settings };
 
 /** 기록 통계 집계 — 0013(Stats), 0014(Share)에서 사용 (구현: 패킷 0006) */
-export type aggregateStatsFn = (records: Record[]) => { totalSpent: number; avgGift: number; recordCount: number; byType: Record<RecordType, number> };
+export type aggregateStatsFn = (records: GiftRecord[]) => { totalSpent: number; avgGift: number; recordCount: number; byType: Record<RecordType, number> };
 
 /** 캔버스 공유 카드 렌더러 — 0014(Share)에서만 사용하지만 복잡도 높음 (구현: 패킷 0006) */
 export type drawShareCardFn = (ctx: CanvasRenderingContext2D, data: ShareCardData) => void;
