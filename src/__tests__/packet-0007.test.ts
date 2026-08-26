@@ -149,18 +149,25 @@ describe("공용 UI 컴포넌트 (SubmitFooter·SummaryHero·CountUp·ChipGroup)
 
       const { CountUp } = await import("@/components/CountUp");
 
+      // rAF는 마운트 effect에서 즉시 예약된다 — advanceTimers()처럼 렌더 이후에
+      // fake timer로 전환하면 이미 실타이머로 예약된 콜백을 따라잡지 못한다.
+      // 렌더 전에 fake timers를 켜서 예약 시점부터 가짜 시계를 쓰게 한다.
+      vi.useFakeTimers();
       renderWithRouter(
         React.createElement(CountUp, { value: 1000, durationMs: 100, testId: "count-value" }),
       );
 
-      await advanceTimers(150);
+      vi.advanceTimersByTime(150);
+      await vi.runAllTimersAsync();
       const finalText = screen.getByTestId("count-value").textContent ?? "";
       expect(finalText).toContain(`${formatNumber(1000)}원`);
 
       // 추가 시간이 지나도 값은 그대로다 (멈춤 확인)
-      await advanceTimers(500);
+      vi.advanceTimersByTime(500);
+      await vi.runAllTimersAsync();
       expect(screen.getByTestId("count-value").textContent).toBe(finalText);
 
+      vi.useRealTimers();
       vi.unstubAllGlobals();
     });
   });
@@ -199,8 +206,9 @@ describe("공용 UI 컴포넌트 (SubmitFooter·SummaryHero·CountUp·ChipGroup)
 
     it("소스 코드에 HEX 색상 리터럴이 없다", async () => {
       const fs = await import("node:fs");
-      const url = new URL("../lib/options.ts", import.meta.url);
-      const src = fs.readFileSync(url, "utf-8");
+      const path = await import("node:path");
+      const optionsPath = path.resolve(process.cwd(), "src/lib/options.ts");
+      const src = fs.readFileSync(optionsPath, "utf-8");
 
       expect(src).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
     });

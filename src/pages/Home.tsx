@@ -1,8 +1,10 @@
-import { Top, Paragraph, Spacing, ListRow, Button } from '@toss/tds-mobile';
+import { Top, Paragraph, Spacing, ListRow, Skeleton, Toast } from '@toss/tds-mobile';
 import { useNavigate } from 'react-router-dom';
+import { generateHapticFeedback } from '@apps-in-toss/web-framework';
 import { ScreenScaffold } from '../components/ScreenScaffold';
 import { SummaryHero } from '../components/SummaryHero';
-import { Card } from '../components/Card';
+import { EmptyState } from '../components/StateView';
+import { AdSlot } from '../components/AdSlot';
 import { Amount } from '../components/Amount';
 import { useStorage } from '../store/StorageProvider';
 import { eventTypeOptions } from '../lib/options';
@@ -16,65 +18,103 @@ const EVENT_HINT: Record<EventType, string> = {
   opening: '축하금 계산하기',
 };
 
+const AD_GROUP_ID: string = import.meta.env.VITE_TOSS_AD_GROUP_ID ?? '';
+
+function tickWeak() {
+  try {
+    Promise.resolve(generateHapticFeedback({ type: 'tickWeak' })).catch(() => {});
+  } catch {
+    /* WebView 밖 — 무시 */
+  }
+}
+
 export default function Home() {
   const navigate = useNavigate();
-  const { lastCalc, records } = useStorage();
+  const { ready, loadError, lastCalc } = useStorage();
 
-  const heroValue = lastCalc ? (
-    <Amount value={lastCalc.result.recommended} unit="원" typography="t1" />
-  ) : (
-    <Paragraph.Text typography="t2">관계와 지역까지 반영해 계산해요</Paragraph.Text>
-  );
+  function goToCalc(eventType: EventType) {
+    tickWeak();
+    navigate('/calc', { state: { eventType } });
+  }
 
-  const heroCaption = lastCalc
-    ? `${EVENT_LABEL[lastCalc.input.eventType]} · ${RELATION_LABEL[lastCalc.input.relation]}`
-    : `기록 ${records.length}건 · 로그인 없이 바로 써요`;
+  function goToLastCalcResult() {
+    if (!lastCalc) return;
+    tickWeak();
+    navigate('/result', { state: { input: lastCalc.input } });
+  }
 
   return (
     <ScreenScaffold
       top={<Top title={<Top.TitleParagraph>축의금 계산기</Top.TitleParagraph>} />}
     >
-      <SummaryHero
-        label={lastCalc ? '최근 계산한 금액' : '얼마가 적당할까'}
-        value={heroValue}
-        caption={heroCaption}
-        action={
-          lastCalc ? (
-            <Button
-              variant="weak"
-              display="block"
-              onClick={() => navigate('/result', { state: { input: lastCalc.input } })}
-            >
-              최근 결과 다시 보기
-            </Button>
-          ) : undefined
-        }
-        testId="home-hero"
-      />
-
-      <Spacing size={24} />
-
-      <Card testId="home-highlights">
+      <div data-testid="home-highlights">
         <Paragraph.Text typography="t5">어떤 경조사인가요?</Paragraph.Text>
-        <Spacing size={4} />
-        <Paragraph.Text typography="st12">고르면 바로 금액 계산으로 넘어가요</Paragraph.Text>
-        <Spacing size={8} />
-        {eventTypeOptions.map((option) => (
-          <ListRow
-            key={option.value}
-            contents={
-              <ListRow.Texts
-                type="2RowTypeA"
-                top={option.label}
-                bottom={EVENT_HINT[option.value]}
-              />
-            }
-            onClick={() => navigate('/calc', { state: { eventType: option.value } })}
-          />
-        ))}
-      </Card>
+        <Spacing size={12} />
 
-      <Spacing size={24} />
+        {!ready ? (
+          <div
+            data-testid="home-types-loading"
+            style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
+          >
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} />
+            ))}
+          </div>
+        ) : (
+          eventTypeOptions.map((option) => (
+            <ListRow
+              key={option.value}
+              contents={
+                <ListRow.Texts
+                  type="2RowTypeA"
+                  top={option.label}
+                  bottom={EVENT_HINT[option.value]}
+                />
+              }
+              onClick={() => goToCalc(option.value)}
+            />
+          ))
+        )}
+      </div>
+
+      <Spacing size={16} />
+
+      <div data-testid="home-hero">
+        {!ready ? (
+          <div data-testid="home-hero-loading">
+            <Skeleton />
+          </div>
+        ) : lastCalc ? (
+          <>
+            <SummaryHero
+              testId="last-calc-card"
+              label="최근 계산한 금액"
+              value={<Amount value={lastCalc.result.recommended} unit="원" typography="t1" />}
+              caption={`${EVENT_LABEL[lastCalc.input.eventType]} · ${RELATION_LABEL[lastCalc.input.relation]}`}
+              onClick={goToLastCalcResult}
+            />
+            <Spacing size={16} />
+            <AdSlot adGroupId={AD_GROUP_ID} />
+          </>
+        ) : (
+          <>
+            <EmptyState
+              title="첫 계산을 시작해보세요"
+              description="유형을 고르면 바로 계산해요"
+            />
+            <Spacing size={16} />
+            <AdSlot adGroupId={AD_GROUP_ID} />
+          </>
+        )}
+      </div>
+
+      <Spacing size={16} />
+
+      <Toast
+        open={loadError}
+        position="bottom"
+        text="저장된 데이터를 불러오지 못했어요"
+      />
     </ScreenScaffold>
   );
 }
