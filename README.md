@@ -1,2 +1,5 @@
+🇺🇸 [한국어](./README.ko.md)
+
 # giftmoneycalc
-관계·지역·물가를 반영해 축의금·부의금 적정 금액을 알려주는 계산기
+
+A calculator that suggests appropriate gift amounts reflecting relationships, regions, and consumer prices.
