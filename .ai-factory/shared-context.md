@@ -163,6 +163,7 @@ export interface RouteState {
 ### File Tree (src/)
   App.tsx
   components/
+    AdSection.tsx
     AdSlot.tsx
     Amount.tsx
     BottomCTA.tsx
@@ -172,6 +173,7 @@ export interface RouteState {
     FloatingTabBar.tsx
     MiniBar.tsx
     PageShell.tsx
+    RewardGate.tsx
     ScreenScaffold.tsx
     Sparkline.tsx
     StateView.tsx
@@ -211,6 +213,7 @@ export interface RouteState {
     globals.css
     reward-ad.css
   types/
+    testing.d.ts
   vite-env.d.ts
 
 ### Exports (src/lib/)
@@ -227,6 +230,7 @@ export interface RouteState {
 - utils.ts: export function cn(...classes: (string | boolean | undefined | null)[]): string; export function formatNumber(n: number): string; export function formatCurrency(n: number, currency = 'KRW'): string
 
 ### Components (src/components/)
+- AdSection.tsx: AdSection
 - AdSlot.tsx: AdSlot
 - Amount.tsx: Amount
 - BottomCTA.tsx: SubmitFooter, ButtonStack
@@ -236,6 +240,7 @@ export interface RouteState {
 - FloatingTabBar.tsx: FloatingTabBar
 - MiniBar.tsx: MiniBar
 - PageShell.tsx: PageShell
+- RewardGate.tsx: RewardGate
 - ScreenScaffold.tsx: ScreenScaffold
 - Sparkline.tsx: Sparkline
 - StateView.tsx: EmptyState, LoadingState
@@ -247,10 +252,7 @@ export interface RouteState {
 ### Module Dependencies (import graph)
   lib/calc.ts → imports: lib/constants, lib/format, lib/types
   lib/constants.ts → imports: lib/types
-  lib/options.ts → imports: lib/types, lib/constants
-  lib/shareCard.ts → imports: lib/constants, lib/format, lib/types
-  lib/stats.ts → imports: lib/types
-...
+  lib/options.ts → imports: lib/types, lib/con...
 CRITICAL: Before creating any new function, type, or component, check the list above. If something similar exists, import and use it.
 
 ## Already Implemented (do NOT duplicate or overwrite)
