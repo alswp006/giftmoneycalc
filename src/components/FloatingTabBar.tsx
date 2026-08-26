@@ -18,9 +18,17 @@ export type TabItem = {
  * 이 컴포넌트는 네이티브 토스처럼 활성탭을 '아이콘+라벨 컬러 틴트'로만 표시한다
  * (배경 알약/Button variant=fill 금지). 활성 판정은 현재 경로(useLocation)로 자동.
  */
-export function FloatingTabBar({ items }: { items: TabItem[] }) {
+export function FloatingTabBar({
+  items,
+  activePath,
+}: {
+  items: TabItem[];
+  /** 활성 탭 경로를 직접 지정한다(App의 Route가 아는 값). 생략하면 현재 경로로 판정. */
+  activePath?: string;
+}) {
   const navigate = useNavigate();
   const location = useLocation();
+  const currentPath = activePath ?? location.pathname;
 
   return (
     <nav
@@ -40,7 +48,7 @@ export function FloatingTabBar({ items }: { items: TabItem[] }) {
       }}
     >
       {items.map((item) => {
-        const active = location.pathname === item.path;
+        const active = currentPath === item.path;
         return (
           <button
             key={item.path}

@@ -12,14 +12,85 @@ import { test, expect, type Page } from "@playwright/test";
  */
 const ROUTES: { path: string; name: string }[] = [
   { path: "/", name: "home" },
-  // { path: "/result", name: "result" },   // ← 이 앱의 라우트를 추가
-  // { path: "/settings", name: "settings" },
+  { path: "/calc", name: "calc" },
+  { path: "/result", name: "result" },
+  { path: "/record/new", name: "record-new" },
+  { path: "/history", name: "history" },
+  { path: "/stats", name: "stats" },
+  { path: "/share", name: "share" },
+  { path: "/settings", name: "settings" },
+  { path: "/no-such-screen", name: "not-found" },
 ];
 
-/** 데이터가 필요한 화면용 localStorage 시드(앱에 맞게 채워라). 앱 스크립트보다 먼저 실행된다. */
+/** 데이터가 필요한 화면용 localStorage 시드. 앱 스크립트보다 먼저 실행된다. */
 async function seed(page: Page): Promise<void> {
   await page.addInitScript(() => {
-    // window.localStorage.setItem("MY_STORAGE_KEY", JSON.stringify({ /* ... */ }));
+    const input = {
+      eventType: "wedding",
+      relation: "closeFriend",
+      intimacy: 4,
+      attendance: "attending",
+      region: "metropolitan",
+    };
+    window.localStorage.setItem(
+      "gmc:lastCalc:v1",
+      JSON.stringify({
+        input,
+        result: {
+          recommended: 200000,
+          min: 150000,
+          max: 300000,
+          rawAmount: 211200,
+          breakdown: [
+            { label: "기본 금액 50,000원", factor: 1 },
+            { label: "관계: 친한 친구", factor: 2 },
+            { label: "친밀도: 자주 만남", factor: 1.2 },
+            { label: "참석: 참석·식사", factor: 1.6 },
+            { label: "지역: 서울·수도권", factor: 1.1 },
+          ],
+          input,
+        },
+        at: 1756200000000,
+      }),
+    );
+    window.localStorage.setItem(
+      "gmc:records:v1",
+      JSON.stringify([
+        {
+          id: "seed-1",
+          personName: "김민서",
+          eventType: "wedding",
+          relation: "coworker",
+          amount: 100000,
+          date: "2026-06-14",
+          direction: "given",
+          memo: "같은 팀",
+          createdAt: 1755000000000,
+        },
+        {
+          id: "seed-2",
+          personName: "박지호",
+          eventType: "funeral",
+          relation: "friend",
+          amount: 50000,
+          date: "2026-07-03",
+          direction: "given",
+          memo: "",
+          createdAt: 1755600000000,
+        },
+        {
+          id: "seed-3",
+          personName: "이서연",
+          eventType: "firstBirthday",
+          relation: "family",
+          amount: 200000,
+          date: "2026-08-09",
+          direction: "received",
+          memo: "",
+          createdAt: 1756100000000,
+        },
+      ]),
+    );
   });
 }
 

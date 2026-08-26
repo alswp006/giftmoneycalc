@@ -190,11 +190,20 @@ export interface RouteState {
     shareCard.ts
     stats.ts
     storage.ts
+    tabs.ts
     types.ts
     utils.ts
   main.tsx
   pages/
+    Calc.tsx
+    History.tsx
     Home.tsx
+    NotFound.tsx
+    RecordNew.tsx
+    Result.tsx
+    Settings.tsx
+    Share.tsx
+    Stats.tsx
     __TdsGallery.tsx
   store/
     StorageProvider.tsx
@@ -213,6 +222,7 @@ export interface RouteState {
 - shareCard.ts: export function drawShareCard(canvas: HTMLCanvasElement, result: CalcResult): void; export function buildShareText(result: CalcResult): string
 - stats.ts: export interface GiftStats; export function aggregateStats(records: GiftRecord[]): GiftStats
 - storage.ts: export function getRecords(): GiftRecord[]; export function addRecord( personName: string, eventType: EventType, relation: RelationType, amount: number, date: strin; export function deleteRecord(id: string): WriteResult; export function getSettings(): Settings; export function saveSettings(settings: Settings): WriteResult; export function getLastCalc(): LastCalc | null; export function saveLastCalc(lastCalc: LastCalc): WriteResult; export function getRewardUnlock(): RewardUnlock
+- tabs.ts: export const TAB_ITEMS: TabItem[] = [; export function isTabRoute(pathname: string): boolean
 - types.ts: export type EventType = "wedding" | "funeral" | "firstBirthday" | "opening"; export type RelationType = | "family" | "closeFriend" | "friend" | "coworker" | "boss" | "acquaintance"; export type RegionType = "seoulGangnam" | "metropolitan" | "majorCity" | "other"; export type Attendance = "attending" | "absent"; export type Intimacy = 1 | 2 | 3 | 4 | 5; export type Direction = "given" | "received"; export interface CalcInput; export interface BreakdownItem
 - utils.ts: export function cn(...classes: (string | boolean | undefined | null)[]): string; export function formatNumber(n: number): string; export function formatCurrency(n: number, currency = 'KRW'): string
 
@@ -240,7 +250,7 @@ export interface RouteState {
   lib/options.ts → imports: lib/types, lib/constants
   lib/shareCard.ts → imports: lib/constants, lib/format, lib/types
   lib/stats.ts → imports: lib/types
-  lib/storage.ts → imports: lib/types, lib/constants
+...
 CRITICAL: Before creating any new function, type, or component, check the list above. If something similar exists, import and use it.
 
 ## Already Implemented (do NOT duplicate or overwrite)
