@@ -202,7 +202,7 @@ export interface RouteState {
 - constants.ts: export const EVENT_BASE: Record<EventType, number> =; export const RELATION_FACTOR: Record<RelationType, number> =; export const INTIMACY_FACTOR: Record<Intimacy, number> =; export const ATTENDANCE_FACTOR: Record<Attendance, number> =; export const REGION_FACTOR: Record<RegionType, number> =; export const AMOUNT_LADDER: number[] = [ 30000, 50000, 70000, 100000, 150000, 200000, 300000, 500000, 1000000, ]; export const EVENT_LABEL: Record<EventType, string> =; export const RELATION_LABEL: Record<RelationType, string> =
 - contract.ts: export type GiftRecord =; export type RecordType = 'gift' | 'received' | 'household'; export type CalcResult =; export type RouteState =; export type Settings =; export type RECORD_TYPES = Record<RecordType,; export type STORAGE_KEYS =; export type CALC_PARAMS =
 - format.ts: export function formatKRW(amount: number): string; export function formatAmountKrw(amount: number, opts?:; export function formatDate(date: string, format: "short" | "long" = "short"): string
-- storage.ts: export function getItem<T>(key: string): T | null; export function setItem<T>(key: string, value: T): void; export function removeItem(key: string): void
+- storage.ts: export function getRecords(): GiftRecord[]; export function addRecord( personName: string, eventType: EventType, relation: RelationType, amount: number, date: strin; export function deleteRecord(id: string): WriteResult; export function getSettings(): Settings; export function saveSettings(settings: Settings): WriteResult; export function getLastCalc(): LastCalc | null; export function saveLastCalc(lastCalc: LastCalc): WriteResult; export function getRewardUnlock(): RewardUnlock
 - types.ts: export type EventType = "wedding" | "funeral" | "firstBirthday" | "opening"; export type RelationType = | "family" | "closeFriend" | "friend" | "coworker" | "boss" | "acquaintance"; export type RegionType = "seoulGangnam" | "metropolitan" | "majorCity" | "other"; export type Attendance = "attending" | "absent"; export type Intimacy = 1 | 2 | 3 | 4 | 5; export type Direction = "given" | "received"; export interface CalcInput; export interface BreakdownItem
 - utils.ts: export function cn(...classes: (string | boolean | undefined | null)[]): string; export function formatNumber(n: number): string; export function formatCurrency(n: number, currency = 'KRW'): string
 
@@ -225,88 +225,11 @@ export interface RouteState {
 ### Module Dependencies (import graph)
   lib/calc.ts → imports: lib/constants, lib/format, lib/types
   lib/constants.ts → imports: lib/types
+  lib/storage.ts → imports: lib/types, lib/constants
 CRITICAL: Before creating any new function, type, or component, check the list above. If something similar exists, import and use it.
 
 ## Already Implemented (do NOT duplicate or overwrite)
 - 0001: 도메인 타입 + RouteState 계약 정의 (files: src/lib/types.ts)
 - 0002: 계수·라벨·스토리지 상수 테이블 (files: src/lib/constants.ts)
 - 0003: 계산 엔진 calcGiftAmount() + 금액 포맷터 (files: src/lib/calc.ts, src/lib/format.ts, src/lib/__tests__/calc.test.ts)
-
-## Available exports from existing files
-// src/App.tsx
-export default function App() {
-
-// src/components/AdSlot.tsx
-export function AdSlot({ adGroupId, className, variant, theme }: AdSlotProps) {
-
-// src/components/Amount.tsx
-export function Amount({
-
-// src/components/BottomCTA.tsx
-export function SubmitFooter({
-export function ButtonStack({
-
-// src/components/Card.tsx
-export function Card({
-
-// src/components/CountUp.tsx
-export function CountUp({
-
-// src/components/FloatingTabBar.tsx
-export type TabItem = {
-export function FloatingTabBar({ items }: { items: TabItem[] }) {
-
-// src/components/MiniBar.tsx
-export function MiniBar({
-
-// src/components/PageShell.tsx
-export function PageShell({ children, style }: { children: ReactNode; style?: CSSProperties }) {
-
-// src/components/ScreenScaffold.tsx
-export function ScreenScaffold({
-
-// src/components/Sparkline.tsx
-export function Sparkline({
-
-// src/components/StateView.tsx
-export function EmptyState({
-export function LoadingState({
-
-// src/components/SummaryHero.tsx
-export function SummaryHero({
-
-// src/components/TossPurchase.tsx
-export interface TossPurchaseResult {
-export function TossPurchase({
-
-// src/components/TossRewardAd.tsx
-export function TossRewardAd({
-
-// src/lib/calc.ts
-export function calcGiftAmount(input: CalcInput): CalcResult {
-
-// src/lib/constants.ts
-export const EVENT_BASE: Record<EventType, number> = {
-export const RELATION_FACTOR: Record<RelationType, number> = {
-export const INTIMACY_FACTOR: Record<Intimacy, number> = {
-export const ATTENDANCE_FACTOR: Record<Attendance, number> = {
-export const REGION_FACTOR: Record<RegionType, number> = {
-export const AMOUNT_LADDER: number[] = [
-export const EVENT_LABEL: Record<EventType, string> = {
-export const RELATION_LABEL: Record<RelationType, string> = {
-export const INTIMACY_LABEL: Record<Intimacy, string> = {
-export const ATTENDANCE_LABEL: Record<Attendance, string> = {
-
-// src/lib/contract.ts
-export type GiftRecord = { id: string; type: RecordType; recipientId: string; amountKrw: number; da
-
-## Memory Index (자동 학습 — 힌트로만 사용, 실제 코드 확인 필수)
-
-Available topics: deploy(1), general(8)
-
-Key lessons (verify against actual code before applying):
-- [general] 의존 그래프 최하층의 타입·계약 파일은 런타임 코드 0줄의 순수 선언으로 가장 먼저 단독 타입체크를 통과시키고, 파일 생성은 셸 명령이 아닌 허용된 편집 도구로만 하게 강제하라. (60% · 타 앱 1회 — 맹신 금지)
-- [general] 영속 저장소에서 읽은 값은 항상 스키마 기본값으로 정규화해 배열·객체 타입을 보장한 뒤 반환하고, 화면은 빈/손상/부분 데이터에서도 렌더되도록 방어하라. (60% · 타 앱 1회 — 맹신 금지)
-- [general] 정책·기능 제거형 리팩터링은 화면과 도메인 로직 레이어에서만 수행하고, package.json의 플랫폼 필수 의존성(디자인 시스템·플랫폼 SDK·프레임워크 코어)은 어떤 경우에도 삭제하지 말 것 — 필수 패키지 화이트리스트를 빌드 전 가드로 검증하라. (60% · 타 앱 1회 — 맹신 금지)
-- [general] 공용 기반 모듈(상수·저장소·계산 유틸)이 실제로 머지되기 전에는 이를 import하는 화면·훅 패킷을 머지하지 말고, 모든 머지 게이트에 타입체크와 프로덕션 빌드 통과(미해결 import 0건)를 필수로 걸어라. (60% · 타 앱 1회 — 맹신 금지)
-- [general] 라우팅·Provider·전역 레이아웃 같은 단일 통합 배선 책임은 하나의 워크패킷에만 할당하고, 다른 패킷은 그 위에 페이지 내부 요소만 얹도록 경계를 명확히 나눠라. (60% · 타 앱 1회 — 맹신 금지)
+- 0004: localStorage 타입 안전 래퍼 storage.ts (files: src/lib/storage.ts, src/lib/__tests__/storage.test.ts)
