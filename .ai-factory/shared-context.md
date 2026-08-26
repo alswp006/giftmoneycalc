@@ -6,6 +6,8 @@
 화면 패킷은 이대로 호출하라. 다르게 만들지 마라.
 
 ```typescript
+import type { ReactNode } from 'react';
+
 /**
  * 패킷 간 인터페이스 계약 — 자동 생성. **수정하지 마라.**
  *
@@ -14,7 +16,7 @@
  */
 
 /** 기본 기록 엔티티 — 모든 페이지에서 참조 (구현: 패킷 0001) */
-export type Record = { id: string; type: RecordType; recipientId: string; amountKrw: number; date: string; occasion?: string };
+export type GiftRecord = { id: string; type: RecordType; recipientId: string; amountKrw: number; date: string; occasion?: string };
 
 /** 기록 유형 enum — 계산·필터링·라벨링 (구현: 패킷 0001) */
 export type RecordType = 'gift' | 'received' | 'household';
@@ -23,7 +25,7 @@ export type RecordType = 'gift' | 'received' | 'household';
 export type CalcResult = { amountKrw: number; reason: string; sourceTable: string };
 
 /** 페이지 간 라우트 상태 전달 — 계산→결과 흐름 (구현: 패킷 0001) */
-export type RouteState = { recordType?: RecordType; recipientId?: string; calcResult?: CalcResult };
+export type RouteState = { recordType?: RecordType; recipientId?: string; calcResult?: CalcResult; giftRecord?: GiftRecord };
 
 /** 사용자 설정 스키마 — 0015(Settings)에서 수정 (구현: 패킷 0005) */
 export type Settings = { defaultLocale: string; listDensity: 'compact' | 'normal'; hideAds?: boolean };
@@ -47,10 +49,10 @@ export type formatAmountKrwFn = (amount: number, opts?: { short?: boolean }) => 
 export type formatDateFn = (date: string, format?: 'short' | 'long') => string;
 
 /** 전역 스토리지 훅 — 모든 페이지의 상태 접근 (구현: 패킷 0005) */
-export type useStorageFn = () => { records: Record[]; addRecord(r: Record): void; deleteRecord(id: string): void; settings: Settings };
+export type useStorageFn = () => { records: GiftRecord[]; addRecord(r: GiftRecord): void; deleteRecord(id: string): void; settings: Settings };
 
 /** 기록 통계 집계 — 0013(Stats), 0014(Share)에서 사용 (구현: 패킷 0006) */
-export type aggregateStatsFn = (records: Record[]) => { totalSpent: number; avgGift: number; recordCount: number; byType: Record<RecordType, number> };
+export type aggregateStatsFn = (records: GiftRecord[]) => { totalSpent: number; avgGift: number; recordCount: number; byType: Record<RecordType, number> };
 
 /** 캔버스 공유 카드 렌더러 — 0014(Share)에서만 사용하지만 복잡도 높음 (구현: 패킷 0006) */
 export type drawShareCardFn = (ctx: CanvasRenderingContext2D, data: ShareCardData) => void;
@@ -64,14 +66,96 @@ export type SubmitFooter = { onSubmit: () => void; isLoading?: boolean; disabled
 /** 결과 요약 헤더 컴포넌트 props — 0010(Result), 0013(Stats)에서 사용 (구현: 패킷 0007) */
 export type SummaryHero = { title: string; amount: number; subtitle?: string };
 
-/** 선택 칩 그룹 컴포넌트 props — 0009(유형 선택), 0012(필터)에서 사용 (구현: 패킷 0007) */
-export type ChipGroup = { options: Array<{ id: string; label: string; emoji?: s
+/** 선택 칩 그룹 컴포넌트 props — 0009(유형 선택), 0012(필터)에서 사용 (구현: 패킷 0007) 
 ```
 
 ## Shared Types Contract (IMPORT these, do NOT redefine)
 ```typescript
-// Domain types — add your app-specific types here
-export {};
+// Domain types — GiftMoneyCalc
+
+export type EventType = "wedding" | "funeral" | "firstBirthday" | "opening";
+
+export type RelationType =
+  | "family"
+  | "closeFriend"
+  | "friend"
+  | "coworker"
+  | "boss"
+  | "acquaintance";
+
+export type RegionType = "seoulGangnam" | "metropolitan" | "majorCity" | "other";
+
+export type Attendance = "attending" | "absent";
+
+export type Intimacy = 1 | 2 | 3 | 4 | 5;
+
+export type Direction = "given" | "received";
+
+export interface CalcInput {
+  eventType: EventType;
+  relation: RelationType;
+  intimacy: Intimacy;
+  attendance: Attendance;
+  region: RegionType;
+}
+
+export interface BreakdownItem {
+  label: string;
+  factor: number;
+}
+
+export interface CalcResult {
+  recommended: number;
+  min: number;
+  max: number;
+  rawAmount: number;
+  breakdown: BreakdownItem[];
+  input: CalcInput;
+}
+
+export interface GiftRecord {
+  id: string;
+  personName: string;
+  eventType: EventType;
+  relation: RelationType;
+  amount: number;
+  date: string;
+  direction: Direction;
+  memo: string;
+  createdAt: number;
+}
+
+export interface Settings {
+  defaultRegion: RegionType;
+  onboardingDone: boolean;
+  compactList: boolean;
+}
+
+export interface LastCalc {
+  input: CalcInput;
+  result: CalcResult;
+  at: number;
+}
+
+export interface RewardUnlock {
+  statsUnlockedUntil: number;
+}
+
+export type WriteResult =
+  | { ok: true }
+  | { ok: false; reason: "QUOTA_EXCEEDED" | "LIMIT_REACHED" | "PARSE_ERROR" };
+
+export interface RouteState {
+  "/calc": { eventType?: EventType } | null;
+  "/result": { input: CalcInput } | null;
+  "/record/new": {
+    prefill?: { eventType: EventType; relation: RelationType; amount: number };
+  } | null;
+  "/share": { result: CalcResult } | null;
+  "/history": null;
+  "/stats": null;
+  "/settings": null;
+}
 
 ```
 
@@ -95,6 +179,7 @@ export {};
     TossRewardAd.tsx
   hooks/
   lib/
+    contract.ts
     storage.ts
     types.ts
     utils.ts
@@ -109,7 +194,9 @@ export {};
   vite-env.d.ts
 
 ### Exports (src/lib/)
+- contract.ts: export type GiftRecord =; export type RecordType = 'gift' | 'received' | 'household'; export type CalcResult =; export type RouteState =; export type Settings =; export type RECORD_TYPES = Record<RecordType,; export type STORAGE_KEYS =; export type CALC_PARAMS =
 - storage.ts: export function getItem<T>(key: string): T | null; export function setItem<T>(key: string, value: T): void; export function removeItem(key: string): void
+- types.ts: export type EventType = "wedding" | "funeral" | "firstBirthday" | "opening"; export type RelationType = | "family" | "closeFriend" | "friend" | "coworker" | "boss" | "acquaintance"; export type RegionType = "seoulGangnam" | "metropolitan" | "majorCity" | "other"; export type Attendance = "attending" | "absent"; export type Intimacy = 1 | 2 | 3 | 4 | 5; export type Direction = "given" | "received"; export interface CalcInput; export interface BreakdownItem
 - utils.ts: export function cn(...classes: (string | boolean | undefined | null)[]): string; export function formatNumber(n: number): string; export function formatCurrency(n: number, currency = 'KRW'): string
 
 ### Components (src/components/)
@@ -129,74 +216,5 @@ export {};
 - TossRewardAd.tsx: TossRewardAd
 CRITICAL: Before creating any new function, type, or component, check the list above. If something similar exists, import and use it.
 
-## Available exports from existing files
-// src/App.tsx
-export default function App() {
-
-// src/components/AdSlot.tsx
-export function AdSlot({ adGroupId, className, variant, theme }: AdSlotProps) {
-
-// src/components/Amount.tsx
-export function Amount({
-
-// src/components/BottomCTA.tsx
-export function SubmitFooter({
-export function ButtonStack({
-
-// src/components/Card.tsx
-export function Card({
-
-// src/components/CountUp.tsx
-export function CountUp({
-
-// src/components/FloatingTabBar.tsx
-export type TabItem = {
-export function FloatingTabBar({ items }: { items: TabItem[] }) {
-
-// src/components/MiniBar.tsx
-export function MiniBar({
-
-// src/components/PageShell.tsx
-export function PageShell({ children, style }: { children: ReactNode; style?: CSSProperties }) {
-
-// src/components/ScreenScaffold.tsx
-export function ScreenScaffold({
-
-// src/components/Sparkline.tsx
-export function Sparkline({
-
-// src/components/StateView.tsx
-export function EmptyState({
-export function LoadingState({
-
-// src/components/SummaryHero.tsx
-export function SummaryHero({
-
-// src/components/TossPurchase.tsx
-export interface TossPurchaseResult {
-export function TossPurchase({
-
-// src/components/TossRewardAd.tsx
-export function TossRewardAd({
-
-// src/lib/contract.ts
-export type Record = { id: string; type: RecordType; recipientId: string; amountKrw: number; date: string; occasion?: string };
-export type RecordType = 'gift' | 'received' | 'household';
-export type CalcResult = { amountKrw: number; reason: string; sourceTable: string };
-export type RouteState = { recordType?: RecordType; recipientId?: string; calcResult?: CalcResult };
-export type Settings = { defaultLocale: string; listDensity: 'compact' | 'normal'; hideAds?: boolean };
-export type RECORD_TYPES = Record<RecordType, { label: string; emoji: string }>;
-export type STORAGE_KEYS = { records: string; lastCalc: string; settings: string };
-export type CALC_PARAMS = { relationshipCoefficients: Record<string, number>; anniversaryYears: number[] };
-export type calcGiftAmountFn = (ty
-
-## Memory Index (자동 학습 — 힌트로만 사용, 실제 코드 확인 필수)
-
-Available topics: deploy(1), general(8)
-
-Key lessons (verify against actual code before applying):
-- [deploy] 번들 빌드가 '0 modules transformed'로 실패하면 런타임 방어 코드를 고치지 말고 엔트리 HTML의 스크립트 경로와 첫 import 체인의 미해결 모듈·대소문자·확장자·alias 불일치를 먼저 검증하라. (60% · 타 앱 1회 — 맹신 금지)
-- [general] 의존 그래프 최하층의 타입·계약 파일은 런타임 코드 0줄의 순수 선언으로 가장 먼저 단독 타입체크를 통과시키고, 파일 생성은 셸 명령이 아닌 허용된 편집 도구로만 하게 강제하라. (60% · 타 앱 1회 — 맹신 금지)
-- [general] 영속 저장소에서 읽은 값은 항상 스키마 기본값으로 정규화해 배열·객체 타입을 보장한 뒤 반환하고, 화면은 빈/손상/부분 데이터에서도 렌더되도록 방어하라. (60% · 타 앱 1회 — 맹신 금지)
-- [general] 정책·기능 제거형 리팩터링은 화면과 도메인 로직 레이어에서만 수행하고, package.json의 플랫폼 필수 의존성(디자인 시스템·플랫폼 SDK·프레임워크 코어)은 어떤 경우에도 삭제하지 말 것 — 필수 패키지 화이트리스트를 빌드 전 가드로 검증하라. (60% · 타 앱 1회 — 맹신 금지)
-- [general] 공용 기반 모듈(상수·저장소·계산 유틸)이 실제로 머지되기 전에는 이를 import하는 화면·훅 패킷을 머지하지 말고, 모든 머지 게이트에 타입체크와 프로덕션 빌드 통과(미해결 import 0건)를 필수로 걸어라. (60% · 타 앱 1회 — 맹신 금지)
+## Already Implemented (do NOT duplicate or overwrite)
+- 0001: 도메인 타입 + RouteState 계약 정의 (files: src/lib/types.ts)
