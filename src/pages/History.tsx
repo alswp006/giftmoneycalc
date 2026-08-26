@@ -1,20 +1,16 @@
 import { useMemo, useState } from "react";
-import {
-  Top,
-  Paragraph,
-  Spacing,
-  ListRow,
-  Button,
-  AlertDialog,
-  Toast,
-} from "@toss/tds-mobile";
+import { Button, Paragraph, Spacing, Toast, Top } from "@toss/tds-mobile";
 import { useNavigate } from "react-router-dom";
+import { generateHapticFeedback } from "@apps-in-toss/web-framework";
 import { ScreenScaffold } from "../components/ScreenScaffold";
 import { ChipGroup } from "../components/ChipGroup";
 import { EmptyState, LoadingState } from "../components/StateView";
+import { RecordList } from "../components/RecordList";
+import { RecordActionSheet } from "../components/RecordActionSheet";
+import { AdSlot } from "../components/AdSlot";
 import { useStorage } from "../store/StorageProvider";
 import { formatKRW } from "../lib/format";
-import { EVENT_LABEL, HISTORY_PAGE_SIZE } from "../lib/constants";
+import { HISTORY_PAGE_SIZE } from "../lib/constants";
 import type { GiftRecord } from "../lib/types";
 
 const FILTERS = [
@@ -23,13 +19,32 @@ const FILTERS = [
   { value: "received", label: "받은 기록" },
 ];
 
+/** 앱인토스 콘솔에서 발급한 배너 광고 그룹 ID (.env의 VITE_TOSS_AD_GROUP_ID) */
+const AD_GROUP_ID: string = import.meta.env.VITE_TOSS_AD_GROUP_ID ?? "";
+
+function fireSuccessHaptic() {
+  try {
+    Promise.resolve(generateHapticFeedback({ type: "success" })).catch(() => {});
+  } catch {
+    /* WebView 밖(브라우저/검수자 PC/jsdom)에서는 throw — 무시 */
+  }
+}
+
+function fireTickHaptic() {
+  try {
+    Promise.resolve(generateHapticFeedback({ type: "tickWeak" })).catch(() => {});
+  } catch {
+    /* WebView 밖 — 무시 */
+  }
+}
+
 export default function History() {
   const navigate = useNavigate();
   const { ready, records, deleteRecord } = useStorage();
 
   const [filter, setFilter] = useState<string>("all");
   const [visible, setVisible] = useState(HISTORY_PAGE_SIZE);
-  const [pendingDelete, setPendingDelete] = useState<GiftRecord | null>(null);
+  const [actionRecord, setActionRecord] = useState<GiftRecord | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
@@ -38,13 +53,21 @@ export default function History() {
   }, [records, filter]);
 
   const total = filtered.reduce((sum, record) => sum + record.amount, 0);
-  const shown = filtered.slice(0, visible);
 
-  function confirmDelete() {
-    if (!pendingDelete) return;
-    const written = deleteRecord(pendingDelete.id);
-    setPendingDelete(null);
-    setToast(written.ok ? "삭제했어요" : "삭제하지 못했어요");
+  function handleSelect(record: GiftRecord) {
+    fireTickHaptic();
+    setActionRecord(record);
+  }
+
+  function handleConfirmDelete(record: GiftRecord) {
+    const written = deleteRecord(record.id);
+    setActionRecord(null);
+    if (written.ok) {
+      fireSuccessHaptic();
+      setToast("삭제했어요");
+    } else {
+      setToast("삭제하지 못했어요");
+    }
   }
 
   return (
@@ -59,9 +82,11 @@ export default function History() {
         testId="group-filter"
       />
       <Spacing size={12} />
-      <Paragraph.Text typography="st11">
-        {filtered.length}건 · {formatKRW(total)}
-      </Paragraph.Text>
+      <div data-testid="history-count">
+        <Paragraph.Text typography="st11">
+          {filtered.length}건 · {formatKRW(total)}
+        </Paragraph.Text>
+      </div>
       <Spacing size={8} />
 
       {!ready ? (
@@ -79,52 +104,23 @@ export default function History() {
         />
       ) : (
         <>
-          {shown.map((record) => (
-            <ListRow
-              key={record.id}
-              contents={
-                <ListRow.Texts
-                  type="2RowTypeA"
-                  top={record.personName}
-                  bottom={`${EVENT_LABEL[record.eventType]} · ${record.date}`}
-                />
-              }
-              right={
-                <Paragraph.Text typography="t6">
-                  {record.direction === "given" ? "-" : "+"}
-                  {formatKRW(record.amount)}
-                </Paragraph.Text>
-              }
-              onClick={() => setPendingDelete(record)}
-            />
-          ))}
-          {filtered.length > shown.length && (
-            <>
-              <Spacing size={12} />
-              <Button
-                variant="weak"
-                display="block"
-                onClick={() => setVisible((prev) => prev + HISTORY_PAGE_SIZE)}
-              >
-                {filtered.length - shown.length}건 더 보기
-              </Button>
-            </>
-          )}
+          <RecordList
+            records={filtered}
+            visibleCount={visible}
+            onLoadMore={() => setVisible((prev) => prev + HISTORY_PAGE_SIZE)}
+            onSelect={handleSelect}
+          />
+          <Spacing size={16} />
+          <AdSlot adGroupId={AD_GROUP_ID} />
         </>
       )}
 
       <Spacing size={24} />
 
-      <AlertDialog
-        open={pendingDelete != null}
-        title="기록을 삭제할까요?"
-        description={
-          pendingDelete ? `${pendingDelete.personName} · ${formatKRW(pendingDelete.amount)}` : ""
-        }
-        alertButton={
-          <AlertDialog.AlertButton onClick={confirmDelete}>삭제</AlertDialog.AlertButton>
-        }
-        onClose={() => setPendingDelete(null)}
+      <RecordActionSheet
+        record={actionRecord}
+        onClose={() => setActionRecord(null)}
+        onConfirmDelete={handleConfirmDelete}
       />
 
       <Toast
