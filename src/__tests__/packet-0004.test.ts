@@ -69,6 +69,7 @@ describe("AC-2: addRecord success — UUID, timestamp, and length", () => {
     );
 
     expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error("expected addRecord to succeed");
     expect(result.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
     expect(result.id.length).toBe(36);
 
@@ -171,9 +172,10 @@ describe("AC-4: QuotaExceededError handling", () => {
       "2026-08-27",
       "given",
       "memo"
-    ) as WriteResult;
+    );
 
     expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("expected addRecord to fail");
     expect(result.reason).toBe("QUOTA_EXCEEDED");
 
     Storage.prototype.setItem = originalSetItem;
@@ -224,9 +226,10 @@ describe("AC-5: 1000-record limit and clearAllData", () => {
       "2026-08-27",
       "given",
       ""
-    ) as WriteResult;
+    );
 
     expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("expected addRecord to fail");
     expect(result.reason).toBe("LIMIT_REACHED");
 
     // Verify count is still 1000
@@ -305,8 +308,9 @@ describe("Additional edge cases", () => {
     const r2 = addRecord("Bob", "funeral", "family", 50000, "2026-08-20", "received", "");
 
     expect(getRecords().length).toBe(2);
+    if (!r1.ok) throw new Error("expected addRecord to succeed");
 
-    deleteRecord(r1.id!);
+    deleteRecord(r1.id);
 
     const remaining = getRecords();
     expect(remaining.length).toBe(1);
