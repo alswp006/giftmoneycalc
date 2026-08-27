@@ -69,8 +69,16 @@ export type updateRecordFn = (
 
 ## Shared Types Contract (IMPORT these, do NOT redefine)
 ```typescript
-// Domain types — add your app-specific types here
-export {};
+export * from "@/domain/types";
+
+import type { CalculationInput } from "@/domain/types";
+
+export type RouteState = {
+  "/result"?: { input: CalculationInput } | { recordId: string } | null;
+  "/history/:id"?: { from?: "list" | "result" } | null;
+  "/"?: { prefill?: Partial<CalculationInput> } | null;
+  "/stats"?: null;
+};
 
 ```
 
@@ -92,8 +100,11 @@ export {};
     SummaryHero.tsx
     TossPurchase.tsx
     TossRewardAd.tsx
+  domain/
+    types.ts
   hooks/
   lib/
+    contract.ts
     storage.ts
     types.ts
     utils.ts
@@ -108,7 +119,9 @@ export {};
   vite-env.d.ts
 
 ### Exports (src/lib/)
+- contract.ts: export type StorageKeys =; export type AdGroupId = string; export type AdSlotId = string; export type calculateFn = (input: CalculationInput) => CalculationResult; export type aggregateFn = (records: HistoryRecord[]) =>; export type saveRecordFn = ( input: Omit<HistoryRecord, "id" | "createdAt" | "updatedAt">, ) => Promise<import("@/domain; export type updateRecordFn = ( id: string, patch: Partial<Omit<HistoryRecord, "id" | "createdAt">>, ) => Promise<import(
 - storage.ts: export function getItem<T>(key: string): T | null; export function setItem<T>(key: string, value: T): void; export function removeItem(key: string): void
+- types.ts: export type RouteState =
 - utils.ts: export function cn(...classes: (string | boolean | undefined | null)[]): string; export function formatNumber(n: number): string; export function formatCurrency(n: number, currency = 'KRW'): string
 
 ### Components (src/components/)
@@ -126,76 +139,11 @@ export {};
 - SummaryHero.tsx: SummaryHero
 - TossPurchase.tsx: TossPurchase
 - TossRewardAd.tsx: TossRewardAd
+
+### Module Dependencies (import graph)
+  lib/contract.ts → imports: domain/types, lib/types, domain/types
+  lib/types.ts → imports: domain/types, domain/types
 CRITICAL: Before creating any new function, type, or component, check the list above. If something similar exists, import and use it.
 
-## Available exports from existing files
-// src/App.tsx
-export default function App() {
-
-// src/components/AdSlot.tsx
-export function AdSlot({ adGroupId, className, variant, theme }: AdSlotProps) {
-
-// src/components/Amount.tsx
-export function Amount({
-
-// src/components/BottomCTA.tsx
-export function SubmitFooter({
-export function ButtonStack({
-
-// src/components/Card.tsx
-export function Card({
-
-// src/components/CountUp.tsx
-export function CountUp({
-
-// src/components/FloatingTabBar.tsx
-export type TabItem = {
-export function FloatingTabBar({ items }: { items: TabItem[] }) {
-
-// src/components/MiniBar.tsx
-export function MiniBar({
-
-// src/components/PageShell.tsx
-export function PageShell({ children, style }: { children: ReactNode; style?: CSSProperties }) {
-
-// src/components/ScreenScaffold.tsx
-export function ScreenScaffold({
-
-// src/components/Sparkline.tsx
-export function Sparkline({
-
-// src/components/StateView.tsx
-export function EmptyState({
-export function LoadingState({
-
-// src/components/SummaryHero.tsx
-export function SummaryHero({
-
-// src/components/TossPurchase.tsx
-export interface TossPurchaseResult {
-export function TossPurchase({
-
-// src/components/TossRewardAd.tsx
-export function TossRewardAd({
-
-// src/lib/contract.ts
-export type RouteState = "home" | "result" | "history" | "history-detail" | "stats";
-export type CalculationInput = { amount: number; years: number; rate: number; compounding: "annual" | "monthly" | "daily" };
-export type CalculationResult = { principal: number; interest: number; finalAmount: number; summary: string };
-export type Record = { id: string; date: string; input: CalculationInput; result: CalculationResult; isFavorite: boolean };
-export type Settings = { currency: "KRW" | "USD"; theme: "light" | "dark"; notificationsEnabled: boolean };
-export type OnboardingState = { completed: boolean; version: number };
-export type Envelope = { version: number; data: T; timestamp: number; checksum: string };
-export type RECORD_KEY = "records";
-export type SETTINGS_KEY = "setting
-
-## Memory Index (자동 학습 — 힌트로만 사용, 실제 코드 확인 필수)
-
-Available topics: deploy(1), general(8)
-
-Key lessons (verify against actual code before applying):
-- [general] 의존 그래프 최하층의 타입·계약 파일은 런타임 코드 0줄의 순수 선언으로 가장 먼저 단독 타입체크를 통과시키고, 파일 생성은 셸 명령이 아닌 허용된 편집 도구로만 하게 강제하라. (60% · 타 앱 1회 — 맹신 금지)
-- [general] 영속 저장소에서 읽은 값은 항상 스키마 기본값으로 정규화해 배열·객체 타입을 보장한 뒤 반환하고, 화면은 빈/손상/부분 데이터에서도 렌더되도록 방어하라. (60% · 타 앱 1회 — 맹신 금지)
-- [general] 정책·기능 제거형 리팩터링은 화면과 도메인 로직 레이어에서만 수행하고, package.json의 플랫폼 필수 의존성(디자인 시스템·플랫폼 SDK·프레임워크 코어)은 어떤 경우에도 삭제하지 말 것 — 필수 패키지 화이트리스트를 빌드 전 가드로 검증하라. (60% · 타 앱 1회 — 맹신 금지)
-- [general] 공용 기반 모듈(상수·저장소·계산 유틸)이 실제로 머지되기 전에는 이를 import하는 화면·훅 패킷을 머지하지 말고, 모든 머지 게이트에 타입체크와 프로덕션 빌드 통과(미해결 import 0건)를 필수로 걸어라. (60% · 타 앱 1회 — 맹신 금지)
-- [general] 라우팅·Provider·전역 레이아웃 같은 단일 통합 배선 책임은 하나의 워크패킷에만 할당하고, 다른 패킷은 그 위에 페이지 내부 요소만 얹도록 경계를 명확히 나눠라. (60% · 타 앱 1회 — 맹신 금지)
+## Already Implemented (do NOT duplicate or overwrite)
+- 0001: 도메인 타입·열거형·RouteState 선언 (files: src/domain/types.ts, src/lib/types.ts)
