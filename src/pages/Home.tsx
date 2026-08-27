@@ -1,73 +1,145 @@
-import { Top, Paragraph, Spacing, ListRow, Button } from '@toss/tds-mobile';
-import { useNavigate } from 'react-router-dom';
-import { ScreenScaffold } from '../components/ScreenScaffold';
-import { SummaryHero } from '../components/SummaryHero';
-import { Card } from '../components/Card';
+import { useEffect, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { Top, Button, Spacing } from '@toss/tds-mobile';
+import { generateHapticFeedback } from '@apps-in-toss/web-framework';
+import { ScreenScaffold } from '@/components/ScreenScaffold';
+import { FloatingTabBar } from '@/components/FloatingTabBar';
+import { CalculateForm } from '@/components/CalculateForm';
+import { getSettings } from '@/storage/prefs';
+import { RELATIONS } from '@/lib/types';
+import type { CalculationInput, Relation, RouteState } from '@/lib/types';
 
 /**
- * Golden Home page — 대시보드/탭-루트 골든 레퍼런스.
- *
- * 다른 페이지를 쓸 때 이 패턴을 모방하라:
- * - ScreenScaffold로 감싼다(raw fragment 골격 금지) — safe-area + 100dvh 자동 처리.
- * - 화면 최상단에 SummaryHero로 시각 앵커를 만든다('휑함'의 가장 큰 원인은 앵커 부재).
- *   데이터가 있으면 value에 <Amount value={n} unit="원" typography="t1" />로 핵심 숫자를 크게 박아라.
- * - 1차 진입 액션은 SummaryHero 카드 내부 버튼(display="block", 전체폭)에 둔다.
- *   → 화면 중앙 부유/좌측 글자폭 버튼 금지. 하단 TabBar가 있으면 SubmitFooter와 겹치므로 카드 안에.
- * - 핵심 정보는 raw <div>가 아니라 Card로 묶어 위계를 만든다.
- * - 하단 탭이 필요하면(2~5탭): bottom={<FloatingTabBar items={[{label,path}...]} />}.
- *   ('TDS TabBar'는 존재하지 않는다 — 직접 만들지 말고 FloatingTabBar를 써라.)
- * - 카피는 CLAUDE.md "카피 규칙 — AI 냄새 금지"를 따른다: 기능 나열식 홍보 문구·상투구·
- *   generic 버튼("시작하기") 금지. 이 파일의 예시 문구도 앱 맥락에 맞게 교체 대상이다.
- *
- * Scaffold tokens (replaced by scaffold-toss.ts at project creation):
- *   GiftMoneyCalc -> the app's display name
- *   관계·지역·물가를 반영해 축의금·부의금 적정 금액을 알려주는 계산기    -> the one-line description
+ * 홈(계산 입력) 화면 — CalculateForm(입력 필드)만 조립하고, 입력 상태(5종)와
+ * 프리필·복원·제출 네비게이션은 이 화면이 소유한다. 계산 자체는 결과 화면 몫.
  */
 
-// ⚠ 이 목록은 골격 예시다 — 앱의 실제 콘텐츠(핵심 지표·최근 기록·바로가기)로 반드시 교체하라.
-// '간편한 사용/빠른 처리' 같은 기능 나열식 홍보 문구는 카피 규칙(CLAUDE.md "AI 냄새 금지") 위반이다.
-// 사용자가 이 화면에서 실제로 확인할 정보를 넣어라 — 아래처럼 데이터가 사는 행으로.
-const HIGHLIGHTS = [
-  { title: '오늘', description: '아직 기록이 없어요' },
-  { title: '이번 주', description: '기록 3건 · 평균 12분' },
+const DRAFT_KEY = 'gyeongjo:draft:home-input';
+
+const TAB_ITEMS = [
+  { label: '홈', path: '/' },
+  { label: '기록', path: '/history' },
+  { label: '통계', path: '/stats' },
 ];
+
+function readDraft(): Partial<CalculationInput> | null {
+  try {
+    const raw = sessionStorage.getItem(DRAFT_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeDraft(input: Partial<CalculationInput>) {
+  try {
+    sessionStorage.setItem(DRAFT_KEY, JSON.stringify(input));
+  } catch {
+    // 저장 실패(사용 불가 환경) — 입력은 그대로 유지되므로 무시
+  }
+}
+
+/** WebView 밖(브라우저·jsdom)에서는 SDK가 throw한다 — 흰 화면 방지로 삼킨다. */
+function fireSuccessHaptic() {
+  try {
+    Promise.resolve(generateHapticFeedback({ type: 'success' })).catch(() => {});
+  } catch {
+    // 네이티브 브릿지 없음 — 무시
+  }
+}
 
 export default function Home() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const prefillFromRoute = (location.state as RouteState['/'])?.prefill;
+
+  // 이번 마운트에서 직접 쓴 draft(초기 입력 반영분)와, 뒤로가기 복원으로 "이미 있던" draft를
+  // 구분해야 한다 — writeDraft 이펙트가 마운트 직후 즉시 실행되므로 비동기 설정 로드가 끝난
+  // 시점에 readDraft()를 다시 부르면 항상 truthy라 설정 기본값 적용 분기가 죽는다.
+  const hadDraftAtMountRef = useRef<Partial<CalculationInput> | null>(null);
+
+  const [input, setInput] = useState<Partial<CalculationInput>>(() => {
+    const draft = readDraft();
+    hadDraftAtMountRef.current = draft;
+    if (draft) return draft;
+    return { attended: true, ...prefillFromRoute };
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    getSettings().then((settings) => {
+      if (cancelled) return;
+      // 뒤로가기 복원(draft) 또는 이전 화면의 prefill이 있으면 설정 기본값으로 덮지 않는다.
+      if (hadDraftAtMountRef.current || prefillFromRoute) return;
+
+      const defaults: Partial<CalculationInput> = {};
+      if (typeof settings.defaultRelation === 'string' && RELATIONS.includes(settings.defaultRelation as Relation)) {
+        defaults.relation = settings.defaultRelation as Relation;
+      }
+      if (typeof settings.defaultAttended === 'boolean') {
+        defaults.attended = settings.defaultAttended;
+      }
+      if (Object.keys(defaults).length > 0) {
+        setInput((prev) => ({ ...prev, ...defaults }));
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 마운트 1회만
+  }, []);
+
+  useEffect(() => {
+    writeDraft(input);
+  }, [input]);
+
+  const canSubmit = Boolean(input.eventType && input.relation);
+
+  function onSubmit() {
+    if (!canSubmit) return;
+    fireSuccessHaptic();
+    const finalInput: CalculationInput = {
+      eventType: input.eventType!,
+      relation: input.relation!,
+      attended: input.attended === true,
+      companions: input.companions ?? 0,
+      eventDate: input.eventDate ?? '',
+    };
+    navigate('/result', { state: { input: finalInput } });
+  }
 
   return (
     <ScreenScaffold
-      top={<Top title={<Top.TitleParagraph>GiftMoneyCalc</Top.TitleParagraph>} />}
+      top={<Top title={<Top.TitleParagraph>경조사비 계산</Top.TitleParagraph>} />}
+      bottom={<FloatingTabBar items={TAB_ITEMS} />}
     >
-      {/* 시각 앵커: 헤드라인 + 카드 내 진입 버튼(부유 금지, display="block" 전체폭).
-          데이터 앱이면 value를 <Amount typography="t1" />(핵심 숫자)로 교체하라. */}
-      <SummaryHero
-        label="GiftMoneyCalc"
-        value={<Paragraph.Text typography="t2">관계·지역·물가를 반영해 축의금·부의금 적정 금액을 알려주는 계산기</Paragraph.Text>}
-        caption="로그인 없이 바로 쓸 수 있어요"
-        action={
-          // 라벨은 앱의 핵심 행동 동사로 교체하라 — "연봉 계산하기"/"기록 남기기" 등.
-          // generic "시작하기"/"확인"은 카피 규칙 위반. onClick도 실제 첫 화면 경로로.
-          <Button variant="fill" display="block" onClick={() => navigate('/')}>
-            첫 결과 보기
-          </Button>
-        }
-        testId="home-hero"
-      />
+      <Spacing size={16} />
+      <CalculateForm value={input} onChange={setInput} />
+      <Spacing size={96} />
 
-      <Spacing size={24} />
-
-      {/* 핵심 정보는 Card로 묶기(raw div 금지) — 위계 생성 */}
-      <Card testId="home-highlights">
-        {HIGHLIGHTS.map((h, idx) => (
-          <ListRow
-            key={idx}
-            contents={<ListRow.Texts type="2RowTypeA" top={h.title} bottom={h.description} />}
-          />
-        ))}
-      </Card>
-
-      <Spacing size={24} />
+      <div
+        data-testid="home-bottom-cta"
+        style={{
+          position: 'fixed',
+          left: 0,
+          right: 0,
+          bottom: 64, // FloatingTabBar 높이만큼 띄워 겹침 방지
+          padding: '12px 16px',
+          paddingBottom: 'calc(16px + env(safe-area-inset-bottom))',
+          backgroundColor: 'var(--adaptiveBackground)',
+        }}
+      >
+        <Button
+          data-testid="home-submit-cta"
+          variant="fill"
+          size="large"
+          display="block"
+          disabled={!canSubmit}
+          onClick={onSubmit}
+        >
+          추천 금액 보기
+        </Button>
+      </div>
     </ScreenScaffold>
   );
 }

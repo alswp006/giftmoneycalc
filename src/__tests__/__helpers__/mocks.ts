@@ -16,7 +16,12 @@ import React from "react";
 import { vi } from "vitest";
 
 export const mockNavigate = vi.fn();
-export const mockLocation = { pathname: "/", search: "", state: null, key: "default" };
+export const mockLocation: { pathname: string; search: string; state: unknown; key: string } = {
+  pathname: "/",
+  search: "",
+  state: null,
+  key: "default",
+};
 
 // ── TDS (@toss/tds-mobile) ──
 // TDS components use CSS-in-JS + layout hooks that crash in jsdom.
@@ -153,15 +158,23 @@ export function mockTds() {
       { Header: ({ children }: any) => React.createElement("div", null, children) },
     ),
 
-    Chip: ({ children, selected, onClick }: any) =>
+    // Chip: 그룹 wrapper(개별 항목은 ChipItem). CalculateForm처럼 <Chip wrap><ChipItem .../></Chip>
+    // 패턴을 쓰는 화면용 — div로 렌더해 ChipItem(button)과 중첩 button을 만들지 않는다.
+    Chip: ({ children, ...props }: any) => React.createElement("div", { role: "group", ...props }, children),
+
+    // ChipItem: 단일 선택형 Chip 그룹의 개별 항목.
+    ChipItem: ({ children, selected, onClick, disabled, left, right, redDot, redDotAriaLabel, ...props }: any) =>
       React.createElement(
         "button",
-        { role: "button", "aria-pressed": selected, onClick },
+        { type: "button", "aria-pressed": !!selected, disabled, onClick, ...props },
         children,
       ),
 
-    Switch: ({ checked, onChange }: any) =>
-      React.createElement("input", { type: "checkbox", checked, onChange, role: "switch" }),
+    Switch: ({ checked, onChange, ...props }: any) =>
+      React.createElement("input", { type: "checkbox", checked, onChange, role: "switch", ...props }),
+
+    FixedBottomCTA: ({ children, onClick, disabled, ...props }: any) =>
+      React.createElement("button", { onClick, disabled, ...props }, children),
   }));
 }
 
