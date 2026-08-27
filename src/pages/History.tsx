@@ -118,8 +118,10 @@ export default function History() {
       {records.length === 0 ? (
         <EmptyState
           icon={
+            /* @AI:NOTE 이름은 CDN 파일명 그대로여야 한다 — 없는 이름이면 403 → "Wrong URL"
+               throw → 에러 바운더리 폴백. 'icon-receipt-mono'는 200 확인됨. */
             <Asset.ContentIcon
-              name="iconReceiptRegular"
+              name="icon-receipt-mono"
               alt="기록 없음"
               style={{ width: 48, height: 48 }}
             />

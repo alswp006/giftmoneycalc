@@ -58,7 +58,13 @@ export default function Stats() {
       {records.length === 0 ? (
         <EmptyState
           icon={
-            <Asset.ContentIcon name="iconChartRegular" alt="통계 없음" style={{ width: 48, height: 48 }} />
+            /* @AI:NOTE 이름은 CDN 파일명 그대로여야 한다 — 없는 이름이면 403 → "Wrong URL"
+               throw → 에러 바운더리 폴백. 'icon-chart-mono'는 200 확인됨. */
+            <Asset.ContentIcon
+              name="icon-chart-mono"
+              alt="통계 없음"
+              style={{ width: 48, height: 48 }}
+            />
           }
           title="아직 통계를 만들 기록이 없어요"
           description="기록을 남기면 여기서 지출을 한눈에 볼 수 있어요"

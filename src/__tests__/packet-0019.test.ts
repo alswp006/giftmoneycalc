@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import React from "react";
-import { render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { mockTds, mockAppsInToss, mockRouter } from "@/__tests__/__helpers__/mocks";
 import { useRecords } from "@/state/useRecords";
@@ -55,6 +55,10 @@ vi.mock("@/pages/HistoryDetail", () => ({
 import App from "@/App";
 
 function renderApp(initialPath: string) {
+  // 한 테스트 안에서 경로를 바꿔가며 여러 번 렌더한다. RTL의 자동 cleanup은 afterEach에서만
+  // 돌기 때문에, 여기서 이전 렌더를 걷어내지 않으면 앞선 경로의 DOM이 document.body에 남아
+  // screen 쿼리에 함께 잡힌다(예: "/"의 탭 3개가 "/result" 단언까지 따라옴).
+  cleanup();
   return render(
     React.createElement(MemoryRouter, { initialEntries: [initialPath] }, React.createElement(App)),
   );

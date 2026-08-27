@@ -52,6 +52,12 @@ export function OnboardingDialog() {
       title={TITLE}
       description={DESCRIPTION}
       onClose={handleConfirm}
+      // @AI:NOTE alertButton이 없으면 실제 TDS는 버튼을 하나도 그리지 않는다 — 딤 클릭으로만
+      //   닫히는 첫 실행 화면이 되어 빠져나갈 길이 보이지 않는다(테스트 mock은 자체 '닫기'
+      //   버튼을 그려서 이 공백을 가린다). 라벨이 '닫기'면 그 mock 버튼과 이름이 겹쳐
+      //   getByRole("button", { name: "닫기" })가 중복으로 터지므로, 안내형 알림의 TDS
+      //   기본 라벨인 '확인'을 쓴다(금지어인 '취소'가 아니다).
+      alertButton={<AlertDialog.AlertButton onClick={handleConfirm}>확인</AlertDialog.AlertButton>}
     />
   );
 }

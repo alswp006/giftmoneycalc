@@ -26,8 +26,13 @@ export default function NotFound() {
       <EmptyState
         testId="notfound-empty"
         icon={
+          /* @AI:NOTE 아이콘 이름은 CDN 파일명 그대로다. TDS는 'icn-'/'icon-'으로 시작하지 않는
+             이름 앞에 'icn-'을 붙여 https://static.toss.im/icons/svg/<name>.svg 를 fetch하는데,
+             없는 파일이면 403 → "Wrong URL" throw → 에러 바운더리(화면 통째로 폴백)까지 간다.
+             그래서 'iconSearchRegular' 같은 카멜케이스 추측이 아니라 실제 200이 확인된
+             'icon-search-mono'를 쓴다. 새 아이콘을 쓸 땐 URL부터 확인할 것. */
           <Asset.ContentIcon
-            name="iconSearchRegular"
+            name="icon-search-mono"
             alt="찾을 수 없음"
             style={{ width: '3rem', height: '3rem' }}
           />

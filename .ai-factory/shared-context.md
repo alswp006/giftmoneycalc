@@ -129,6 +129,7 @@ export type RouteState = {
     HistoryDetail.tsx
     Home.tsx
     NotFound.tsx
+    Result.tsx
     Stats.tsx
     __TdsGallery.tsx
   state/
@@ -187,6 +188,7 @@ export type RouteState = {
   pages/HistoryDetail.tsx → imports: components/ScreenScaffold, components/BottomCTA, components/Card, components/Amount, lib/utils, state/useRecords, lib/types
   pages/Home.tsx → imports: components/ScreenScaffold, components/FloatingTabBar, components/CalculateForm, storage/prefs, lib/types, lib/types
   pages/NotFound.tsx → imports: components/ScreenScaffold, components/StateView
+  pages/Result.tsx → imports: components/ScreenScaffold, components/BottomCTA, components/Card, components/Amount, components/SummaryHero, components/ResultBanner, components/SaveRecordSheet, domain/calculate, lib/utils, lib/types
   pages/Stats.tsx → imports: components/ScreenScaffold, components/Card, components/SummaryHero, components/Amount, components/StateView, components/RewardGate, components/StatsDetail, components/FloatingTabBar, state/useRecords, domain/aggregate, storage/prefs, lib/adConfig
 CRITICAL: Before creating any new function, type, or component, check the list above. If something similar exists, import and use it.
 
@@ -208,3 +210,83 @@ CRITICAL: Before creating any new function, type, or component, check the list a
 - 0014: 홈(계산 입력) 화면 조립 `/` (files: src/pages/Home.tsx)
 - 0012: 온보딩 다이얼로그 + 에러 바운더리 컴포넌트 (files: src/components/OnboardingDialog.tsx, src/components/AppErrorBoundary.tsx)
 - 0013: 탭 레이아웃 래퍼 + NotFound 화면 (files: src/components/AppLayout.tsx, src/pages/NotFound.tsx)
+
+## TDD 상태
+⚠️ TDD 테스트 파일 자동 작성에 실패했습니다. 소스 코드를 작성하기 전에 `src/__tests__/packet-XXXX.test.ts` 파일에 AC 기반 테스트를 먼저 작성하세요 (TDD red phase). 테스트 작성 후 구현하세요.
+
+## Available exports from existing files
+// src/App.tsx
+export default function App() {
+
+// src/components/AdSlot.tsx
+export function AdSlot({ adGroupId, className, variant, theme }: AdSlotProps) {
+
+// src/components/Amount.tsx
+export function Amount({
+
+// src/components/AppErrorBoundary.tsx
+export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorBoundaryState> {
+export default AppErrorBoundary;
+
+// src/components/AppLayout.tsx
+export type TabKey = 'home' | 'history' | 'stats';
+export function AppLayout({ active, children }: { active: TabKey; children?: ReactNode }) {
+export default AppLayout;
+
+// src/components/BottomCTA.tsx
+export function SubmitFooter({
+export function ButtonStack({
+
+// src/components/CalculateForm.tsx
+export type CalculateFormProps = {
+export function CalculateForm({ value, onChange }: CalculateFormProps) {
+export default CalculateForm;
+
+// src/components/Card.tsx
+export function Card({
+
+// src/components/CountUp.tsx
+export function CountUp({
+
+// src/components/FloatingTabBar.tsx
+export type TabItem = {
+export function FloatingTabBar({
+
+// src/components/MiniBar.tsx
+export function MiniBar({
+
+// src/components/OnboardingDialog.tsx
+export function OnboardingDialog() {
+export default OnboardingDialog;
+
+// src/components/PageShell.tsx
+export function PageShell({ children, style }: { children: ReactNode; style?: CSSProperties }) {
+
+// src/components/ResultBanner.tsx
+export function ResultBanner() {
+
+// src/components/RewardGate.tsx
+export function isRewardUnlocked(lastUnlockedAt: number | null, now: number): boolean {
+export function RewardGate({ slotId, children }: { slotId: string | null; children?: ReactNode }) {
+
+// src/components/SaveRecordSheet.tsx
+export default function SaveRecordSheet({ open, record, onClose, onSaved }: SaveRecordSheetProps) {
+
+// src/components/ScreenScaffold.tsx
+export function ScreenScaffold({
+
+// src/components/ShareCardSheet.tsx
+export default function ShareCardSheet({ open, data, onClose }: ShareCardSheetProps) {
+
+// src/components/Spa
+
+## Memory Index (자동 학습 — 힌트로만 사용, 실제 코드 확인 필수)
+
+Available topics: deploy(1), general(8)
+
+Key lessons (verify against actual code before applying):
+- [general] 의존 그래프 최하층의 타입·계약 파일은 런타임 코드 0줄의 순수 선언으로 가장 먼저 단독 타입체크를 통과시키고, 파일 생성은 셸 명령이 아닌 허용된 편집 도구로만 하게 강제하라. (60% · 타 앱 1회 — 맹신 금지)
+- [general] 영속 저장소에서 읽은 값은 항상 스키마 기본값으로 정규화해 배열·객체 타입을 보장한 뒤 반환하고, 화면은 빈/손상/부분 데이터에서도 렌더되도록 방어하라. (60% · 타 앱 1회 — 맹신 금지)
+- [general] 정책·기능 제거형 리팩터링은 화면과 도메인 로직 레이어에서만 수행하고, package.json의 플랫폼 필수 의존성(디자인 시스템·플랫폼 SDK·프레임워크 코어)은 어떤 경우에도 삭제하지 말 것 — 필수 패키지 화이트리스트를 빌드 전 가드로 검증하라. (60% · 타 앱 1회 — 맹신 금지)
+- [general] 공용 기반 모듈(상수·저장소·계산 유틸)이 실제로 머지되기 전에는 이를 import하는 화면·훅 패킷을 머지하지 말고, 모든 머지 게이트에 타입체크와 프로덕션 빌드 통과(미해결 import 0건)를 필수로 걸어라. (60% · 타 앱 1회 — 맹신 금지)
+- [general] 라우팅·Provider·전역 레이아웃 같은 단일 통합 배선 책임은 하나의 워크패킷에만 할당하고, 다른 패킷은 그 위에 페이지 내부 요소만 얹도록 경계를 명확히 나눠라. (60% · 타 앱 1회 — 맹신 금지)
