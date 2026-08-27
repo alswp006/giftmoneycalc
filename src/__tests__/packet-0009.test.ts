@@ -59,7 +59,7 @@ vi.mock("@apps-in-toss/web-framework", () => ({
   share: vi.fn(async () => {}),
 }));
 
-const mockRenderShareCard = vi.fn(() => true);
+const mockRenderShareCard = vi.fn((..._args: unknown[]) => true);
 vi.mock("@/components/shareCardRenderer", () => ({
   renderShareCard: (...args: unknown[]) => mockRenderShareCard(...args),
 }));
