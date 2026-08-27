@@ -382,7 +382,7 @@ describe("Packet 0004: 저장소 저수준 I/O — readEnvelope/writeEnvelope/ne
       const { newUuid } = await import("@/storage/uuid");
 
       // crypto.randomUUID가 존재하는 환경에서 테스트
-      if (crypto?.randomUUID) {
+      if (typeof crypto?.randomUUID === "function") {
         const uuid = newUuid();
         // 반환값이 문자열
         expect(typeof uuid).toBe("string");
