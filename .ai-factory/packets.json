@@ -1,0 +1,690 @@
+[
+  {
+    "id": "0001",
+    "title": "도메인 타입·열거형·RouteState 선언",
+    "epic": "Epic 1: 데이터 레이어",
+    "task": {
+      "description": "SPEC §1.1/§1.2의 열거형(EVENT_TYPES 4종, RELATIONS 6종), 관대 타입(StoredEventType/StoredRelation), HistoryRecord, 계산 입출력 타입, StorageResult를 src/domain/types.ts에 선언한다. src/lib/types.ts는 도메인 타입을 re-export하는 얇은 배럴이며 화면 간 네비게이션 계약인 RouteState를 정의한다. 런타임 로직 0건(as const 배열 선언만 허용).",
+      "acceptance_criteria": [
+        "src/domain/types.ts에 EVENT_TYPES(WEDDING/FUNERAL/FIRST_BIRTHDAY/OPENING), RELATIONS(FAMILY/RELATIVE/CLOSE_FRIEND/FRIEND/COWORKER/ACQUAINTANCE), EventType, Relation, StoredEventType, StoredRelation, HistoryRecord가 export되고 HistoryRecord의 optional 필드는 counterpartLabel과 memo 뿐이다",
+        "CalculationInput = { eventType: EventType; relation: Relation; attended: boolean; companions: number; eventDate: string } 이 정확히 존재한다",
+        "CalculationResult = { recommended: number; breakdown: { base: number; relationMultiplier: number; mealCost: number; companions: number; subtotal: number; rounded: number; clamped: boolean }; ruleVersion: 1 } 이 존재한다",
+        "StorageResult<T> = { ok: true; value: T } | { ok: false; code: 'INVALID_RECORD' | 'RECORD_LIMIT_EXCEEDED' | 'QUOTA_EXCEEDED' | 'CORRUPTED' | 'READ_ONLY_VERSION'; field?: string } 이 존재한다",
+        "src/lib/types.ts가 domain/types 전체를 re-export하고 RouteState({'/result': { input: CalculationInput } | { recordId: string } | null; '/history/:id': { from?: 'list' | 'result' } | null; '/': { prefill?: Partial<CalculationInput> } | null; '/stats': null})를 export하며, 두 파일에 function/=>/Date/Math 문자열이 0건이고 tsc --noEmit 통과"
+      ]
+    },
+    "covers": [
+      "F2 AC-2"
+    ],
+    "files": [
+      "src/domain/types.ts",
+      "src/lib/types.ts"
+    ],
+    "definition_of_done": [
+      "tsc --noEmit 통과, vite build 성공",
+      "두 파일 모두 import 런타임 코드 없음(타입/상수 배열만)"
+    ],
+    "depends_on": [],
+    "db_schema": "type HistoryRecord = { id: string; eventType: StoredEventType; relation: StoredRelation; amount: number; recommendedAmount: number; attended: boolean; companions: number; eventDate: string; counterpartLabel?: string; memo?: string; ruleVersion: number; createdAt: string; updatedAt: string } → localStorage key: 'gyeongjo:v1:records'",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": ""
+  },
+  {
+    "id": "0002",
+    "title": "룰 테이블 상수 · 저장소 키 · Envelope 타입",
+    "epic": "Epic 1: 데이터 레이어",
+    "task": {
+      "description": "SPEC §1.5 룰 테이블(BASE_AMOUNT, RELATION_MULTIPLIER, MEAL_COST, MIN/MAX, RULE_VERSION)을 src/domain/rules.ts에, §1.3 저장소 키·스키마 버전·Envelope 타입 3종을 src/storage/keys.ts에 선언한다. 룰 테이블은 Record<EventType, number> / Record<Relation, number>로 선언해 키 누락 시 컴파일 에러가 나게 한다. 순수 선언만 포함하며 런타임 함수는 넣지 않는다.",
+      "acceptance_criteria": [
+        "BASE_AMOUNT: WEDDING/FUNERAL/OPENING=50000, FIRST_BIRTHDAY=30000 / RELATION_MULTIPLIER: FAMILY=4.0, RELATIVE=2.0, CLOSE_FRIEND=2.0, FRIEND=1.0, COWORKER=1.0, ACQUAINTANCE=0.6 / MEAL_COST: WEDDING=30000, FUNERAL=20000, FIRST_BIRTHDAY=30000, OPENING=20000 값이 정확히 일치",
+        "MIN_AMOUNT=30000, MAX_AMOUNT=1000000, RULE_VERSION=1 as const export",
+        "src/storage/keys.ts에 SCHEMA_VERSION=1 as const와 STORAGE_KEYS={records:'gyeongjo:v1:records', settings:'gyeongjo:v1:settings', reward:'gyeongjo:v1:reward', onboard:'gyeongjo:v1:onboarded'}가 바이트 단위 일치, CORRUPT_KEY_PREFIX='gyeongjo:corrupt:'",
+        "RecordsEnvelope/SettingsEnvelope/RewardEnvelope 타입이 §1.3대로 export되고 tsc --noEmit 통과"
+      ]
+    },
+    "covers": [
+      "F2 AC-2"
+    ],
+    "files": [
+      "src/domain/rules.ts",
+      "src/storage/keys.ts"
+    ],
+    "definition_of_done": [
+      "tsc --noEmit 통과, vite build 성공",
+      "BASE_AMOUNT에서 키 1개를 지우면 tsc가 실패함을 수동 확인"
+    ],
+    "depends_on": [
+      "0001"
+    ],
+    "db_schema": "RecordsEnvelope { schemaVersion: number; updatedAt: string; records: HistoryRecord[] } → 'gyeongjo:v1:records' / SettingsEnvelope → 'gyeongjo:v1:settings' / RewardEnvelope { schemaVersion; lastUnlockedAt: number } → 'gyeongjo:v1:reward'",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": ""
+  },
+  {
+    "id": "0003",
+    "title": "계산 엔진 calculate() + 집계 aggregate() + 결정론 스캔 테스트",
+    "epic": "Epic 1: 데이터 레이어",
+    "task": {
+      "description": "SPEC §1.5 공식대로 calculate(input: CalculationInput): CalculationResult를 구현하고, 히스토리 배열을 받아 총액/건수/유형별 합계/월별 추이를 만드는 순수 함수 aggregate(records)를 같은 도메인 디렉터리에 구현한다. 두 함수 모두 Date/Math.random/crypto 사용 금지(Math.ceil/min/max만 허용). 골든 케이스와 정적 스캔 테스트를 함께 작성한다.",
+      "acceptance_criteria": [
+        "raw = BASE*MULT + (attended ? MEAL*(1+companions) : 0) → ceil(raw/10000)*10000 → clamp(30000,1000000) 순서로 계산하고 breakdown.clamped는 클램프 발생 시에만 true",
+        "골든 6종 결과가 하드코딩 값과 일치: 50,000 / 80,000 / 110,000 / 100,000 / 50,000 / 260,000",
+        "companions가 비정수·음수·9초과면 RangeError(메시지에 'companions' 포함), eventType/relation이 유니온 밖이면 TypeError(메시지에 입력 원문 포함)",
+        "동일 입력 100회 호출 결과의 JSON.stringify가 100개 전부 동일하고, attended=false × companions 0~9의 10케이스 모두 breakdown.mealCost === 0",
+        "정적 스캔 테스트: src/domain/** 소스에 'Date.now', 'new Date', 'Math.random', 'crypto.' 문자열이 0건이며 'storage/uuid' import도 0건",
+        "aggregate(records)가 빈 배열 입력 시 { total: 0, count: 0, byEventType: {}, monthly: [] } 형태를 반환하고 예외를 던지지 않음"
+      ]
+    },
+    "covers": [
+      "F2 AC-1",
+      "F2 AC-2",
+      "F2 AC-3",
+      "F2 AC-4",
+      "F2 AC-5",
+      "F2 AC-6",
+      "F2 AC-7"
+    ],
+    "files": [
+      "src/domain/calculate.ts",
+      "src/domain/aggregate.ts",
+      "src/domain/__tests__/calculate.test.ts",
+      "src/domain/__tests__/determinism.scan.test.ts"
+    ],
+    "definition_of_done": [
+      "vitest 전체 통과, tsc --noEmit 통과, vite build 성공"
+    ],
+    "depends_on": [
+      "0002"
+    ],
+    "db_schema": "",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": ""
+  },
+  {
+    "id": "0004",
+    "title": "저장소 저수준 I/O — Envelope 읽기/쓰기 · 손상 격리 · 마이그레이션 · UUID 폴백",
+    "epic": "Epic 1: 데이터 레이어",
+    "task": {
+      "description": "모든 Envelope에 공통 적용되는 안전 I/O 계층을 만든다. readEnvelope/writeEnvelope는 파싱 실패·스키마 불일치·쿼터 초과를 전면 try/catch로 흡수해 결과 객체로 반환하고 예외를 상위로 던지지 않는다. migrations 등록부와 crypto.randomUUID 폴백(newUuid)을 storage 디렉터리에만 둔다. CRUD는 다음 패킷에서 이 계층 위에 얹는다.",
+      "acceptance_criteria": [
+        "readEnvelope(key, fallback): JSON.parse 실패 또는 schemaVersion 누락/비정수/스키마 불일치 시 원본 문자열을 'gyeongjo:corrupt:<suffix>'에 복사한 뒤 원 키를 fallback으로 재초기화하고 { ok:false, code:'CORRUPTED' } 반환 — corrupt 키 값이 주입한 원본 문자열과 정확히 동일함을 테스트",
+        "schemaVersion < SCHEMA_VERSION이면 migrations를 오름차순 순차 적용해 저장 후 반환, schemaVersion > SCHEMA_VERSION이면 쓰기 없이 { ok:false, code:'READ_ONLY_VERSION' } 반환하고 호출 전후 localStorage.getItem(key) 문자열이 동일",
+        "키 부재 시 { schemaVersion:1, updatedAt, records: [] } 형태의 빈 Envelope로 초기화 후 반환",
+        "writeEnvelope: setItem이 QuotaExceededError 또는 name==='NS_ERROR_DOM_QUOTA_REACHED' 예외를 던지면 { ok:false, code:'QUOTA_EXCEEDED' } 반환하고 예외 미전파",
+        "src/storage/uuid.ts: crypto.randomUUID 있으면 사용, undefined면 Math.random 기반 v4 폴백 — 폴백 1000회 생성값 전부 /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/ 만족"
+      ]
+    },
+    "covers": [
+      "F1 AC-5",
+      "F1 AC-6",
+      "F1 AC-7",
+      "F1 AC-8"
+    ],
+    "files": [
+      "src/storage/envelope.ts",
+      "src/storage/migrations.ts",
+      "src/storage/uuid.ts",
+      "src/storage/__tests__/envelope.test.ts",
+      "src/storage/__tests__/uuid.test.ts"
+    ],
+    "definition_of_done": [
+      "vitest 통과(손상/다운그레이드/쿼터/키부재 4경로 각각 케이스 존재), tsc --noEmit 통과, vite build 성공"
+    ],
+    "depends_on": [
+      "0002"
+    ],
+    "db_schema": "RecordsEnvelope/SettingsEnvelope/RewardEnvelope 공통 봉투 I/O — 손상 백업 키 'gyeongjo:corrupt:<suffix>'",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": ""
+  },
+  {
+    "id": "0005",
+    "title": "레코드 CRUD + 설정·리워드·온보딩 저장소",
+    "epic": "Epic 1: 데이터 레이어",
+    "task": {
+      "description": "envelope 계층 위에 HistoryRecord CRUD(saveRecord/updateRecord/deleteRecord/listRecords)를 구현하고, 같은 계층의 부가 저장소(getSettings/setSettings, getReward/setRewardUnlockedNow, isOnboarded/setOnboarded)를 별도 파일로 만든다. 필수 필드 검증·ID/타임스탬프 생성·500건 상한·불변 필드 보호를 이 패킷에서 마무리한다.",
+      "acceptance_criteria": [
+        "saveRecord(input): 11개 필수 필드(id 제외 생성 필드 포함) 중 하나라도 undefined/null이면 저장 없이 { ok:false, code:'INVALID_RECORD', field:'<필드명>' } 반환 — 11케이스 전부 ok===false이고 field 값 일치",
+        "신규 저장 시 id가 UUID v4 정규식을 만족하고 createdAt === updatedAt이며 두 값 모두 /^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$/ 만족",
+        "updateRecord(id, patch): patch에 id/createdAt이 있어도 무시하고, 갱신 후 id·createdAt은 문자 단위 동일, updatedAt만 변경. deleteRecord(id)는 해당 1건만 제거하고 나머지 건수 불변",
+        "records가 이미 500건이면 saveRecord가 { ok:false, code:'RECORD_LIMIT_EXCEEDED' }를 반환하고 저장 전후 records JSON 문자열이 바이트 단위 동일(FIFO 자동 삭제 없음)",
+        "getReward()는 lastUnlockedAt이 NaN/비수/누락이면 null을 반환하고, setRewardUnlockedNow()는 Date.now() 값을 저장 후 { ok:true } 반환. listRecords()는 손상/다운그레이드 상황에서도 빈 배열을 반환하고 예외를 던지지 않음"
+      ]
+    },
+    "covers": [
+      "F1 AC-1",
+      "F1 AC-2",
+      "F1 AC-3",
+      "F1 AC-4"
+    ],
+    "files": [
+      "src/storage/records.ts",
+      "src/storage/prefs.ts",
+      "src/storage/__tests__/records.test.ts"
+    ],
+    "definition_of_done": [
+      "vitest 통과, tsc --noEmit 통과, vite build 성공"
+    ],
+    "depends_on": [
+      "0004"
+    ],
+    "db_schema": "records: HistoryRecord[] (최대 500) → 'gyeongjo:v1:records' / settings → 'gyeongjo:v1:settings' / reward { lastUnlockedAt: epoch ms } → 'gyeongjo:v1:reward' / onboarded: '1' → 'gyeongjo:v1:onboarded'",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": ""
+  },
+  {
+    "id": "0006",
+    "title": "상태 관리 — RecordsProvider + useRecords (낙관적 업데이트·롤백)",
+    "epic": "Epic 1: 데이터 레이어",
+    "task": {
+      "description": "records 저장소를 감싸는 React Context Provider와 useRecords 훅을 만든다. 화면은 저장소를 직접 호출하지 않고 이 훅만 사용한다. 추가/수정/삭제는 낙관적 업데이트 후 저장소 결과가 ok:false면 이전 배열로 즉시 롤백하고 실패 코드를 반환해, 롤백 로직이 화면마다 중복되지 않도록 단일 지점에 봉인한다.",
+      "acceptance_criteria": [
+        "RecordsProvider 마운트 시 listRecords()로 초기 배열을 1회 로드하고, 손상 데이터여도 크래시 없이 빈 배열 상태가 된다",
+        "useRecords()가 { records, add, update, remove, reload, lastError } 를 반환하고 Provider 밖에서 호출하면 명시적 에러 메시지를 던진다",
+        "add/update/remove는 먼저 상태를 갱신(낙관적)하고 저장소가 ok:false를 반환하면 호출 직전 배열로 정확히 복원한 뒤 { ok:false, code } 를 반환한다 — QUOTA_EXCEEDED와 RECORD_LIMIT_EXCEEDED 각 1케이스 테스트",
+        "records는 항상 eventDate 내림차순(동일 날짜면 createdAt 내림차순)으로 정렬되어 제공된다"
+      ]
+    },
+    "covers": [
+      "F1 AC-1",
+      "F1 AC-4",
+      "F1 AC-6"
+    ],
+    "files": [
+      "src/state/RecordsProvider.tsx",
+      "src/state/useRecords.ts",
+      "src/state/__tests__/useRecords.test.tsx"
+    ],
+    "definition_of_done": [
+      "vitest 통과, tsc --noEmit 통과, vite build 성공"
+    ],
+    "depends_on": [
+      "0005"
+    ],
+    "db_schema": "",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": ""
+  },
+  {
+    "id": "0007",
+    "title": "계산 입력 폼 컴포넌트 CalculateForm",
+    "epic": "Epic 2: 화면/컴포넌트",
+    "task": {
+      "description": "행사 유형 Chip 4종, 관계 Chip 6종, 참석 Switch, 동반 인원 TextField, 행사 날짜 TextField로 구성된 제어 컴포넌트를 만든다. 값과 onChange를 props로 받는 순수 프레젠테이션 컴포넌트이며 라우팅·저장소를 직접 호출하지 않는다. 하단 고정 CTA는 조립 화면이 소유하므로 여기서는 렌더하지 않는다.",
+      "acceptance_criteria": [
+        "유형 Chip 4개(결혼식/장례식/돌잔치/개업)와 관계 Chip 6개(가족/친척/절친/친구/직장동료/지인)가 각각 단일 선택으로 토글되고, 선택 Chip은 variant='filled', 비선택은 'outlined'",
+        "참석 Switch가 off면 동반 인원 TextField가 DOM에서 사라지고, on이면 나타난다",
+        "동반 인원 입력이 9를 초과하면 값이 9로 고정되고 help='최대 9명'이 유지된다(숫자 외 문자는 무시)",
+        "Chip 탭과 Switch 전환 시 generateHapticFeedback({ type: 'tickWeak' }) 호출, 모든 인터랙티브 요소 히트 영역 44px 이상",
+        "TDS 이외 UI 라이브러리 미사용, 색상 HEX 하드코딩 0건, 간격은 TDS Spacing만 사용"
+      ]
+    },
+    "covers": [
+      "F3 AC-1",
+      "F3 AC-2",
+      "F3 AC-5",
+      "F3 AC-7"
+    ],
+    "files": [
+      "src/components/CalculateForm.tsx"
+    ],
+    "definition_of_done": [
+      "tsc --noEmit 통과, vite build 성공",
+      "props 계약: { value: Partial<CalculationInput>; onChange: (next: Partial<CalculationInput>) => void }"
+    ],
+    "depends_on": [],
+    "db_schema": "",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": "### TDS Components (whitelist)\nParagraph, Chip, Switch, TextField, Spacing, ListRow\n\n### Layout (Blueprint 발췌 — 폼 영역만 소유)\n<Paragraph.Text typography=\"t4\">어떤 자리인가요?</Paragraph.Text>\n<Spacing size={12} />\n<div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>\n  {/* 결혼식 · 장례식 · 돌잔치 · 개업 */}\n  <Chip label=\"결혼식\" variant={sel ? 'filled' : 'outlined'} selected={sel} />\n</div>\n<Spacing size={24} />\n<Paragraph.Text typography=\"t4\">상대와 어떤 사이인가요?</Paragraph.Text>\n<Spacing size={12} />\n<div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>\n  {/* 가족 · 친척 · 절친 · 친구 · 직장동료 · 지인 (6종) */}\n</div>\n<Spacing size={24} />\n<ListRow\n  contents={<ListRow.Texts type=\"2RowTypeA\" top=\"행사에 참석해요\" bottom=\"식대가 추천 금액에 더해져요\" />}\n  right={<Switch checked={attended} onChange={onToggleAttend} />}\n/>\n{attended && (\n  <TextField variant=\"box\" label=\"동반 인원 (본인 제외)\" inputMode=\"numeric\"\n    value={companions} onChange={onCompanionsChange} help=\"최대 9명\" />\n)}\n<Spacing size={16} />\n<TextField variant=\"box\" label=\"행사 날짜\" value={eventDate} onChange={onDateChange} />\n\n### States\n- Loading: 프리필 로딩 중에도 Chip 영역은 그대로 렌더(깜빡임 없음)\n- Empty: 해당 없음 — 미선택이 기본 상태\n- Error: 동반 인원 9 초과 시 help=\"최대 9명\" 유지 + 값 9로 고정\n\n### Interactions\n- Chip 탭 → 단일 선택 토글 + tickWeak 햅틱\n- Switch 전환 → tickWeak, off일 때 동반 인원 필드 숨김\n- 모든 Chip/Switch 히트 영역 44×44 이상"
+  },
+  {
+    "id": "0008",
+    "title": "기록 저장 BottomSheet 컴포넌트 SaveRecordSheet",
+    "epic": "Epic 2: 화면/컴포넌트",
+    "task": {
+      "description": "결과 화면에서 실제 낸 금액·상대 표기·메모를 입력받아 저장하는 BottomSheet 컴포넌트를 만든다. 입력 검증(금액 1~10,000,000 정수, 상대 표기 20자, 메모 100자)과 저장 실패 코드별 Toast 문구를 컴포넌트 안에서 처리하고, 성공 시 onSaved(recordId) 콜백으로 부모에 알린다.",
+      "acceptance_criteria": [
+        "금액이 비었거나 1 미만 또는 10,000,000 초과면 저장 버튼 disabled 상태이고 TextField가 에러 상태로 표시된다",
+        "상대 표기 20자, 메모 100자를 초과하는 입력은 잘려서 반영된다",
+        "저장 실패 코드 QUOTA_EXCEEDED → Toast '저장 공간이 부족해요', RECORD_LIMIT_EXCEEDED → Toast '기록은 500개까지 저장할 수 있어요. 오래된 기록을 지워주세요'",
+        "저장 성공 시 Toast '기록했어요' 노출 후 시트가 닫히고 onSaved(recordId)가 정확히 1회 호출된다",
+        "저장 버튼 탭 시 generateHapticFeedback({ type: 'success' }) 호출, TDS 외 UI 라이브러리 0건"
+      ]
+    },
+    "covers": [
+      "F4 AC-3",
+      "F4 AC-4",
+      "F1 AC-6"
+    ],
+    "files": [
+      "src/components/SaveRecordSheet.tsx"
+    ],
+    "definition_of_done": [
+      "tsc --noEmit 통과, vite build 성공",
+      "props 계약: { open: boolean; onClose: () => void; input: CalculationInput; recommended: number; onSaved: (id: string) => void }"
+    ],
+    "depends_on": [],
+    "db_schema": "HistoryRecord(amount, counterpartLabel?, memo?, recommendedAmount, ruleVersion) 저장 — 'gyeongjo:v1:records'",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": "### Pattern\nFixedBottomCTA (BottomSheet 내부)\n\n### TDS Components (whitelist)\nBottomSheet, Paragraph, TextField, Spacing, Button, Toast\n\n### Layout\n<BottomSheet open={open} onClose={onClose}>\n  <Paragraph.Text typography=\"t4\">실제로 낸 금액을 남겨요</Paragraph.Text>\n  <Spacing size={16} />\n  <TextField variant=\"box\" label=\"낸 금액\" inputMode=\"numeric\" value={amount} onChange={onAmountChange} />\n  <Spacing size={12} />\n  <TextField variant=\"box\" label=\"상대 표기 (선택)\" value={label} onChange={onLabelChange} help=\"최대 20자\" />\n  <Spacing size={12} />\n  <TextField variant=\"box\" label=\"메모 (선택)\" value={memo} onChange={onMemoChange} help=\"최대 100자\" />\n  <Spacing size={24} />\n  <Button variant=\"fill\" size=\"large\" disabled={!valid} onClick={onSave}>기록하기</Button>\n  <Spacing size={8} />\n</BottomSheet>\n\n### States\n- Loading: 저장은 동기 — 버튼 중복 탭 방지용 disabled만 적용\n- Empty: 금액 미입력 시 CTA disabled\n- Error: 금액 범위 이탈 시 TextField 에러 상태 + help 문구, 저장 실패 시 Toast\n\n### Interactions\n- 저장 탭 → success 햅틱 → 저장 → Toast → onClose\n- 시트 배경 탭/스와이프로 닫힘, 닫아도 입력값 손실 안내 없음(단순 폐기)"
+  },
+  {
+    "id": "0009",
+    "title": "공유 카드 — Canvas 렌더러 + ShareCardSheet",
+    "epic": "Epic 2: 화면/컴포넌트",
+    "task": {
+      "description": "추천 금액·행사 유형·관계·날짜를 담은 정사각 공유 카드 이미지를 Canvas로 그리는 순수 렌더러와, 미리보기·저장을 제공하는 오버레이 시트 컴포넌트를 만든다. 카드에는 상대 표기와 메모를 절대 포함하지 않는다(개인정보 최소화). 렌더러는 DOM 의존 최소화로 canvas 엘리먼트를 인자로 받는다.",
+      "acceptance_criteria": [
+        "renderShareCard(canvas, data)가 1080×1080 캔버스에 금액을 #,###원 포맷으로 그리고 상대 표기·메모 문자열은 어떤 경우에도 그려지지 않는다(입력에 포함돼도 무시)",
+        "ShareCardSheet 오픈 시 미리보기 이미지가 표시되고, 저장 버튼 탭 시 toDataURL('image/png') 결과로 다운로드/공유 동작이 실행된다",
+        "Canvas 미지원 또는 렌더 예외 발생 시 Toast '공유 카드를 만들지 못했어요'를 띄우고 시트는 정상적으로 닫힌다(앱 크래시 없음)",
+        "카드 배경/텍스트 색상은 TDS 토큰 값을 getComputedStyle로 읽어 사용하거나 흑백 고정값만 사용하고, 브랜드 HEX 하드코딩은 하지 않는다"
+      ]
+    },
+    "covers": [
+      "F7 AC-1",
+      "F7 AC-2",
+      "F7 AC-3"
+    ],
+    "files": [
+      "src/components/shareCardRenderer.ts",
+      "src/components/ShareCardSheet.tsx"
+    ],
+    "definition_of_done": [
+      "tsc --noEmit 통과, vite build 성공",
+      "props 계약: { open: boolean; onClose: () => void; data: { eventType: EventType; relation: Relation; eventDate: string; recommended: number } }"
+    ],
+    "depends_on": [],
+    "db_schema": "",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": "### Pattern\nOverlaySheet (BottomSheet 내 미리보기)\n\n### TDS Components (whitelist)\nBottomSheet, Paragraph, Spacing, Button, Toast\n\n### Layout\n<BottomSheet open={open} onClose={onClose}>\n  <Paragraph.Text typography=\"t4\">공유 카드를 만들었어요</Paragraph.Text>\n  <Spacing size={16} />\n  <div style={{ display: 'flex', justifyContent: 'center' }}>\n    <canvas ref={canvasRef} style={{ width: '100%', maxWidth: 320, aspectRatio: '1 / 1', borderRadius: 16 }} />\n  </div>\n  <Spacing size={24} />\n  <Button variant=\"fill\" size=\"large\" onClick={onSaveImage}>이미지로 저장하기</Button>\n  <Spacing size={8} />\n  <Button variant=\"weak\" size=\"large\" onClick={onClose}>닫기</Button>\n  <Spacing size={8} />\n</BottomSheet>\n\n### States\n- Loading: 렌더 중 캔버스 영역에 TDS Skeleton 대체 표시(200ms 이내)\n- Empty: 해당 없음\n- Error: 렌더 실패 시 Toast '공유 카드를 만들지 못했어요' + 시트 닫힘\n\n### Interactions\n- 저장 탭 → success 햅틱 → PNG 저장\n- 카드에는 상대 표기/메모 미포함"
+  },
+  {
+    "id": "0010",
+    "title": "통계 상세 차트 컴포넌트 StatsDetail (MiniBar · Sparkline)",
+    "epic": "Epic 2: 화면/컴포넌트",
+    "task": {
+      "description": "aggregate() 결과를 받아 유형별 막대(MiniBar)와 월별 추이(Sparkline)를 그리는 프레젠테이션 컴포넌트를 만든다. 외부 차트 라이브러리 없이 div/SVG와 TDS 컴포넌트만으로 구성하고 색상은 var(--tds-color-*)만 사용한다. 저장소·광고 로직은 포함하지 않는다.",
+      "acceptance_criteria": [
+        "유형별 막대가 합계 내림차순으로 정렬되고 각 행에 유형명·금액(#,###원)·비율(%)이 표시된다",
+        "월별 추이 Sparkline이 최근 6개월 구간을 그리고 데이터가 1개월뿐이면 점 1개만 그려도 예외가 발생하지 않는다",
+        "전체 합계가 0이면 막대 폭 계산에서 0으로 나누지 않고 모든 막대 폭이 0%로 렌더된다",
+        "외부 차트 라이브러리 import 0건, HEX 색상 하드코딩 0건, 고정 px width 미사용(퍼센트 기반)"
+      ]
+    },
+    "covers": [
+      "F6 AC-4",
+      "F6 AC-5"
+    ],
+    "files": [
+      "src/components/StatsDetail.tsx"
+    ],
+    "definition_of_done": [
+      "tsc --noEmit 통과, vite build 성공",
+      "props 계약: { data: ReturnType<typeof aggregate> }"
+    ],
+    "depends_on": [],
+    "db_schema": "",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": "### TDS Components (whitelist)\nParagraph, ListRow, Border, Spacing\n\n### Layout\n<Paragraph.Text typography=\"t4\">유형별로 얼마나 냈을까요</Paragraph.Text>\n<Spacing size={12} />\n{/* 각 행: ListRow(left=유형명) + right=금액, 아래 막대 div (width: `${ratio}%`, backgroundColor: 'var(--tds-color-primary)') */}\n<Border />\n<Spacing size={24} />\n<Paragraph.Text typography=\"t4\">최근 6개월 추이</Paragraph.Text>\n<Spacing size={12} />\n<svg viewBox=\"0 0 300 80\" style={{ width: '100%', height: 80 }}>...</svg>\n\n### States\n- Loading: 상위 화면이 담당 — 여기서는 데이터가 항상 존재한다고 가정\n- Empty: total === 0이면 막대 폭 0%, Sparkline은 기준선만 렌더\n- Error: 없음(순수 렌더)\n\n### Interactions\n- 정적 표시 전용, 탭 인터랙션 없음"
+  },
+  {
+    "id": "0011",
+    "title": "광고 컴포넌트 — ResultBanner · RewardGate · 광고 식별자 접근자",
+    "epic": "Epic 2: 화면/컴포넌트",
+    "task": {
+      "description": "SPEC §1.6 규범대로 배너(AdSlot·adGroupId·VITE_TOSS_AD_GROUP_ID)와 리워드 전면(TossRewardAd·slotId·VITE_TOSS_AD_SLOT_ID)을 각각 감싼 두 컴포넌트와 env 접근자를 만든다. 두 식별자는 서로 다른 광고 상품이므로 이름을 통일하거나 교차 전달하지 않는다. env가 비면 해당 영역을 렌더하지 않고 나머지 화면은 정상 동작해야 한다.",
+      "acceptance_criteria": [
+        "src/lib/adConfig.ts가 getAdGroupId()/getRewardSlotId()를 export하고 값이 undefined 또는 빈 문자열이면 null을 반환하며, 코드에 광고 ID 리터럴 하드코딩 0건(import.meta.env 경유만)",
+        "ResultBanner: adGroupId가 null이면 아무 노드도 렌더하지 않고(빈 박스·스피너 금지), 있으면 <AdSlot adGroupId={...} /> 1개만 렌더",
+        "RewardGate: slotId가 null이면 게이트 없이 children을 그대로 렌더, 있으면 <TossRewardAd slotId={...}>로 children을 감싼다",
+        "리워드 해제 시각은 getReward()로 읽어 Date.now()와 비교하며, 미래 시각(now보다 큼)이나 NaN이면 잠금 상태로 취급한다",
+        "AdSlot에 slotId를, TossRewardAd에 adGroupId를 전달하지 않음을 소스 검사로 확인"
+      ]
+    },
+    "covers": [
+      "F4 AC-2",
+      "F4 AC-8",
+      "F6 AC-3",
+      "F6 AC-9"
+    ],
+    "files": [
+      "src/lib/adConfig.ts",
+      "src/components/ResultBanner.tsx",
+      "src/components/RewardGate.tsx"
+    ],
+    "definition_of_done": [
+      "tsc --noEmit 통과, vite build 성공",
+      "env 미주입 상태로 dev 서버를 띄워도 화면이 정상 렌더됨"
+    ],
+    "depends_on": [],
+    "db_schema": "RewardEnvelope { schemaVersion; lastUnlockedAt: number } → 'gyeongjo:v1:reward'",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": "### TDS Components (whitelist)\nAdSlot(템플릿 제공), TossRewardAd(템플릿 제공), Button, Paragraph, Spacing\n\n### Layout\n{/* ResultBanner */}\n{adGroupId ? <AdSlot adGroupId={adGroupId} /> : null}\n\n{/* RewardGate — 잠금 상태 */}\n<Paragraph.Text typography=\"t4\">광고를 보면 상세 통계를 볼 수 있어요</Paragraph.Text>\n<Spacing size={12} />\n<TossRewardAd slotId={slotId}>{children}</TossRewardAd>\n\n### States\n- Loading: 광고 로드 중 children 자리에 TDS Skeleton\n- Empty: env 미주입 → 광고 노드 자체 미렌더(배너) / 게이트 없이 children 노출(리워드)\n- Error: 광고 로드 실패 시 Toast 없이 조용히 미렌더, 화면 나머지 정상\n\n### Interactions\n- 배너는 콘텐츠 최하단, CTA와 겹치지 않게 배치"
+  },
+  {
+    "id": "0012",
+    "title": "온보딩 다이얼로그 + 에러 바운더리 컴포넌트",
+    "epic": "Epic 2: 화면/컴포넌트",
+    "task": {
+      "description": "첫 실행 시 1회만 노출되는 온보딩 AlertDialog(참고용 금액 안내)와, 렌더 예외를 잡아 복구 UI를 보여주는 클래스형 에러 바운더리를 만든다. 온보딩 노출 여부는 'gyeongjo:v1:onboarded' 플래그로 판단하며, 두 컴포넌트 모두 App.tsx 배선은 다음 통합 패킷이 담당한다.",
+      "acceptance_criteria": [
+        "온보딩 플래그가 없으면 다이얼로그가 1회 노출되고 확인 시 'gyeongjo:v1:onboarded'='1'이 저장되어 재마운트 시 다시 뜨지 않는다",
+        "다이얼로그 문구는 해요체이며 '국내 통념 기준의 참고용 금액이에요' 안내를 포함하고, 왼쪽 버튼 라벨은 '닫기'(취소 금지)",
+        "에러 바운더리가 하위 렌더 예외를 잡아 '화면을 불러오지 못했어요' 문구와 '다시 시도' TDS Button을 보여주고, 버튼 탭 시 에러 상태가 초기화되어 children을 재렌더한다",
+        "localStorage 접근이 실패하는 환경에서도 온보딩 컴포넌트가 예외를 던지지 않는다(try/catch)"
+      ]
+    },
+    "covers": [
+      "F8 AC-4",
+      "F8 AC-5"
+    ],
+    "files": [
+      "src/components/OnboardingDialog.tsx",
+      "src/components/AppErrorBoundary.tsx"
+    ],
+    "definition_of_done": [
+      "tsc --noEmit 통과, vite build 성공",
+      "AI 고지 문구는 포함하지 않음(생성형 AI 미사용)"
+    ],
+    "depends_on": [],
+    "db_schema": "onboarded: '1' | 미존재 → 'gyeongjo:v1:onboarded'",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": "### TDS Components (whitelist)\nAlertDialog, Paragraph, Button, Spacing\n\n### Layout\n<AlertDialog open={open} title=\"참고용 추천 금액이에요\"\n  description=\"국내 통념을 바탕으로 계산한 참고 금액이에요. 상황에 맞게 조절해도 좋아요.\"\n  left={{ text: '닫기', onClick: onClose }}\n  right={{ text: '알겠어요', onClick: onConfirm }} />\n\n{/* 에러 바운더리 폴백 */}\n<Paragraph.Text typography=\"t4\">화면을 불러오지 못했어요</Paragraph.Text>\n<Spacing size={16} />\n<Button variant=\"fill\" size=\"large\" onClick={onRetry}>다시 시도</Button>\n\n### States\n- Loading: 없음\n- Empty: 온보딩 완료 시 아무 것도 렌더하지 않음\n- Error: 폴백 UI + 재시도 버튼\n\n### Interactions\n- 확인 탭 → success 햅틱 → 플래그 저장 후 닫힘"
+  },
+  {
+    "id": "0013",
+    "title": "탭 레이아웃 래퍼 + NotFound 화면",
+    "epic": "Epic 2: 화면/컴포넌트",
+    "task": {
+      "description": "탭 루트 화면(/, /history, /stats)에서 공통으로 쓰는 FloatingTabBar 레이아웃 래퍼와, 알 수 없는 경로에서 보여줄 NotFound 화면을 만든다. 래퍼는 children 아래 고정 탭바를 배치하고 safe-area를 반영한 하단 여백을 확보한다. 라우트 등록은 다음 통합 패킷이 담당한다.",
+      "acceptance_criteria": [
+        "AppLayout이 children을 렌더하고 하단에 FloatingTabBar(계산/기록/통계 3탭)를 고정 배치하며 active prop으로 현재 탭이 컬러 틴트로 표시된다",
+        "고정 요소에 paddingBottom: 'calc(16px + env(safe-area-inset-bottom))'이 적용되고 콘텐츠 하단이 탭바에 가리지 않도록 Spacing이 확보된다",
+        "NotFound가 '찾을 수 없는 화면이에요' 문구와 '홈으로 가기' TDS Button을 렌더하고 탭 시 navigate('/', { replace: true })가 호출된다",
+        "고정 px width 미사용, HEX 색상 0건, TDS 외 UI 라이브러리 0건"
+      ]
+    },
+    "covers": [
+      "F8 AC-2",
+      "F8 AC-6"
+    ],
+    "files": [
+      "src/components/AppLayout.tsx",
+      "src/pages/NotFound.tsx"
+    ],
+    "definition_of_done": [
+      "tsc --noEmit 통과, vite build 성공",
+      "FloatingTabBar는 템플릿 제공 컴포넌트를 재사용(재작성 금지)"
+    ],
+    "depends_on": [],
+    "db_schema": "",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": "### Pattern\nTabRootLayout / EmptyState(NotFound)\n\n### TDS Components (whitelist)\nTop, Paragraph, Spacing, Button, Asset.ContentIcon, FloatingTabBar(템플릿 제공)\n\n### Layout\n{/* AppLayout */}\n<div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column' }}>\n  {children}\n  <Spacing size={96} />\n</div>\n<FloatingTabBar active={active} />\n\n{/* NotFound */}\n<Top title={<Top.TitleParagraph>찾을 수 없는 화면</Top.TitleParagraph>} />\n<Spacing size={48} />\n<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>\n  <Asset.ContentIcon name=\"icon-search\" />\n  <Spacing size={16} />\n  <Paragraph.Text typography=\"t5\">찾을 수 없는 화면이에요</Paragraph.Text>\n  <Spacing size={24} />\n  <Button variant=\"fill\" size=\"large\" onClick={goHome}>홈으로 가기</Button>\n</div>\n\n### States\n- Loading/Empty/Error: NotFound는 정적 화면\n\n### Interactions\n- 탭 전환 시 tickWeak 햅틱, 활성 탭 컬러 틴트"
+  },
+  {
+    "id": "0014",
+    "title": "홈(계산 입력) 화면 조립 `/`",
+    "epic": "Epic 2: 화면/컴포넌트",
+    "task": {
+      "description": "CalculateForm을 조립해 홈 화면을 완성한다. 설정 저장소의 기본값 프리필, 하단 고정 CTA, 입력 검증, navigate('/result', { state: { input } }) 네비게이션, 뒤로가기 복귀 시 입력 5종 복원을 담당한다. 계산 자체는 결과 화면이 수행하며 여기서는 입력 상태만 관리한다.",
+      "acceptance_criteria": [
+        "유형과 관계가 모두 선택되기 전에는 하단 CTA가 disabled이고, 둘 다 선택되면 활성화된다",
+        "CTA 탭 시 generateHapticFeedback({ type: 'success' }) 후 navigate('/result', { state: { input } })가 RouteState['/result'] 타입으로 호출된다",
+        "설정에 defaultRelation/defaultAttended가 있으면 첫 렌더에 프리필되고, location.state.prefill이 있으면 프리필보다 우선 적용된다",
+        "결과 화면에서 뒤로가기로 돌아오면 유형·관계·참석·동반 인원·날짜 5종 값이 이전과 동일하게 복원된다",
+        "하단 고정 CTA에 paddingBottom: 'calc(16px + env(safe-area-inset-bottom))' 적용, TDS 외 UI 라이브러리 0건"
+      ]
+    },
+    "covers": [
+      "F3 AC-3",
+      "F3 AC-4",
+      "F3 AC-6"
+    ],
+    "files": [
+      "src/pages/Home.tsx"
+    ],
+    "definition_of_done": [
+      "tsc --noEmit 통과, vite build 성공",
+      "CalculateForm은 import만 하고 수정하지 않음"
+    ],
+    "depends_on": [
+      "0007"
+    ],
+    "db_schema": "SettingsEnvelope { defaultRelation?; defaultAttended? } → 'gyeongjo:v1:settings'",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": "### Pattern\nFixedBottomCTA\n\n### TDS Components (whitelist)\nTop, Paragraph, Chip, Switch, TextField, Spacing, ListRow, Button, Toast, FloatingTabBar\n\n### Layout\n<Top title={<Top.TitleParagraph>경조사비 계산</Top.TitleParagraph>} />\n<Spacing size={16} />\n{/* CalculateForm (유형 Chip 4 · 관계 Chip 6 · 참석 Switch · 동반 인원 · 날짜) */}\n<Spacing size={96} /> {/* 하단 고정 CTA 여백 */}\n\n{/* Pattern D: Bottom Fixed CTA */}\n<div style={{ position: 'fixed', left: 0, right: 0, bottom: 0, padding: 16,\n  paddingBottom: 'calc(16px + env(safe-area-inset-bottom))',\n  backgroundColor: 'var(--tds-color-background)' }}>\n  <Button variant=\"fill\" size=\"large\" disabled={!eventType || !relation} onClick={onSubmit}>\n    추천 금액 보기\n  </Button>\n</div>\n<FloatingTabBar active=\"calculate\" />\n\n### States\n- Loading: 설정 프리필 로딩 중 Chip 영역은 그대로 렌더(깜빡임 없음), CTA만 disabled\n- Empty: 해당 없음(입력 폼) — 미선택 상태가 기본\n- Error: 동반 인원 9 초과 시 help=\"최대 9명\" + 값 9로 고정\n\n### Interactions\n- Chip 탭 → 단일 선택 토글, tickWeak 햅틱\n- 참석 Switch off일 때 동반 인원 필드 숨김\n- CTA 탭 → success 햅틱 후 navigate('/result', { state: { input } })\n- 뒤로가기 복귀 시 입력 5종 복원"
+  },
+  {
+    "id": "0015",
+    "title": "결과 화면 조립 `/result`",
+    "epic": "Epic 2: 화면/컴포넌트",
+    "task": {
+      "description": "location.state를 가드해 calculate()를 호출하고 히어로 금액·계산 breakdown·CTA 2종(공유 카드/기록하기)·하단 배너를 조립한다. state가 없으면 홈으로 replace 리다이렉트한다. SaveRecordSheet·ShareCardSheet·ResultBanner는 import해 조립만 하며 수정하지 않는다.",
+      "acceptance_criteria": [
+        "location.state가 없거나 input 형태가 아니면 렌더 대신 navigate('/', { replace: true })가 실행된다",
+        "히어로에 추천 금액이 #,###원 포맷으로 1회 렌더되고, breakdown 4행(기본 금액/관계 가중/식대/만원 단위 올림)이 계산값과 일치한다",
+        "clamped가 true면 마지막 행 bottom 텍스트가 '상·하한 조정 적용', false면 '조정 없음'",
+        "'이 금액으로 기록하기' 탭 → success 햅틱 + SaveRecordSheet 오픈, '공유 카드 만들기' 탭 → ShareCardSheet 오픈",
+        "배너는 CTA 아래 콘텐츠 최하단에 배치되고 env 미주입 시 노드 자체가 렌더되지 않는다"
+      ]
+    },
+    "covers": [
+      "F4 AC-1",
+      "F4 AC-2",
+      "F4 AC-6",
+      "F4 AC-8"
+    ],
+    "files": [
+      "src/pages/Result.tsx"
+    ],
+    "definition_of_done": [
+      "tsc --noEmit 통과, vite build 성공",
+      "SaveRecordSheet/ShareCardSheet/ResultBanner는 import만 수행"
+    ],
+    "depends_on": [
+      "0008",
+      "0009",
+      "0011"
+    ],
+    "db_schema": "",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": "### Pattern\nStatusPanel\n\n### TDS Components (whitelist)\nTop, SummaryHero, Amount, Paragraph, ListRow, Border, Spacing, Button, AdSlot, Toast, AlertDialog\n\n### Layout\n<Top title={<Top.TitleParagraph>추천 금액</Top.TitleParagraph>} />\n<Spacing size={16} />\n{/* Pattern A: Hero Summary Card — 핵심 숫자 앵커 */}\n<SummaryHero\n  label=\"이 자리에 어울리는 금액\"\n  value={<Amount value={recommended} unit=\"원\" typography=\"t1\" />}\n  caption=\"국내 통념 기준의 참고용 금액이에요\"\n/>\n<Spacing size={24} />\n<Paragraph.Text typography=\"t4\">이렇게 계산했어요</Paragraph.Text>\n<Spacing size={12} />\n<ListRow contents={<ListRow.Texts type=\"2RowTypeA\" top=\"기본 금액\" bottom=\"결혼식 기준\" />}\n  right={<Paragraph.Text typography=\"st9\">50,000원</Paragraph.Text>} />\n<ListRow contents={<ListRow.Texts type=\"2RowTypeA\" top=\"관계 가중\" bottom=\"직장동료\" />}\n  right={<Paragraph.Text typography=\"st9\">×1.0</Paragraph.Text>} />\n<ListRow contents={<ListRow.Texts type=\"2RowTypeA\" top=\"식대\" bottom=\"참석 · 동반 1명\" />}\n  right={<Paragraph.Text typography=\"st9\">60,000원</Paragraph.Text>} />\n<Border />\n<ListRow contents={<ListRow.Texts type=\"2RowTypeA\" top=\"만원 단위 올림\" bottom={clamped ? '상·하한 조정 적용' : '조정 없음'} />}\n  right={<Paragraph.Text typography=\"st9\">110,000원</Paragraph.Text>} />\n<Spacing size={24} />\n<div style={{ display: 'flex', gap: 8, padding: '0 16px' }}>\n  <Button variant=\"weak\" size=\"large\" onClick={onOpenShare}>공유 카드 만들기</Button>\n  <Button variant=\"fill\" size=\"large\" onClick={onOpenSaveSheet}>이 금액으로 기록하기</Button>\n</div>\n<Spacing size={24} />\n{adGroupId ? <AdSlot adGroupId={adGroupId} /> : null}\n<Spacing size={16} />\n\n### States\n- Loading: 계산은 동기 순수 함수 — 로딩 상태 없음(200ms 이내 전환)\n- Empty: location.state 없으면 렌더 대신 홈으로 replace 리다이렉트\n- Error: 광고 env 미주입 시 AdSlot 노드 자체를 렌더하지 않음(빈 박스·스피너 금지)\n\n### Interactions\n- 진입 시 히어로 금액 1회 렌더, #,###원 포맷\n- '이 금액으로 기록하기' 탭 → success 햅틱 + 저장 BottomSheet 오픈\n- 배너는 스크롤 최하단, 히어로/CTA와 겹치지 않음"
+  },
+  {
+    "id": "0016",
+    "title": "히스토리 목록 화면 `/history`",
+    "epic": "Epic 2: 화면/컴포넌트",
+    "task": {
+      "description": "useRecords로 기록 목록을 읽어 유형 필터 Chip과 리스트를 렌더한다. 알 수 없는 eventType/relation 값은 '기타'로 폴백 표시하고 크래시하지 않는다. 50건 이상이면 윈도잉(가시 영역 렌더)으로 스크롤 성능을 확보하고, 빈 상태에는 아이콘·문구·계산하러 가기 CTA를 둔다.",
+      "acceptance_criteria": [
+        "유형 필터 Chip(전체/결혼식/장례식/돌잔치/개업) 단일 선택이 동작하고 선택 시 목록이 해당 유형만 표시된다",
+        "각 행에 날짜·유형·관계·금액(#,###원)이 표시되고 저장된 eventType/relation이 유니온 밖 값이면 '기타'로 표시되며 렌더 예외가 발생하지 않는다",
+        "기록이 0건이면 Asset.ContentIcon + '아직 기록이 없어요' + '계산하러 가기' Button이 표시되고 탭 시 '/'로 이동한다",
+        "목록이 50건 이상일 때 한 번에 DOM에 렌더되는 행이 50개 이하로 유지된다(윈도잉)",
+        "행 탭 시 navigate(`/history/${id}`, { state: { from: 'list' } })가 호출된다"
+      ]
+    },
+    "covers": [
+      "F5 AC-1",
+      "F5 AC-2",
+      "F5 AC-9"
+    ],
+    "files": [
+      "src/pages/History.tsx"
+    ],
+    "definition_of_done": [
+      "tsc --noEmit 통과, vite build 성공",
+      "외부 가상 스크롤 라이브러리 없이 구현"
+    ],
+    "depends_on": [],
+    "db_schema": "records: HistoryRecord[] → 'gyeongjo:v1:records'",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": "### Pattern\nListWithFilter + EmptyState\n\n### TDS Components (whitelist)\nTop, Chip, ListRow, Paragraph, Spacing, Button, Asset.ContentIcon, Border, FloatingTabBar\n\n### Layout\n<Top title={<Top.TitleParagraph>기록</Top.TitleParagraph>} />\n<Spacing size={12} />\n<div style={{ display: 'flex', gap: 8, overflowX: 'auto' }}>\n  {/* 전체 · 결혼식 · 장례식 · 돌잔치 · 개업 */}\n  <Chip label=\"전체\" variant={sel ? 'filled' : 'outlined'} selected={sel} />\n</div>\n<Spacing size={16} />\n<ListRow\n  contents={<ListRow.Texts type=\"2RowTypeA\" top=\"결혼식 · 직장동료\" bottom=\"2026-08-12\" />}\n  right={<Paragraph.Text typography=\"st9\">100,000원</Paragraph.Text>}\n  onClick={() => goDetail(id)} />\n<Spacing size={96} />\n<FloatingTabBar active=\"history\" />\n\n### States\n- Loading: 초기 로드 중 ListRow 3개 분량 TDS Skeleton\n- Empty: Asset.ContentIcon + '아직 기록이 없어요' + Button '계산하러 가기'\n- Error: 손상 데이터 시 Toast '기록을 불러오지 못했어요' + 빈 목록 표시\n\n### Interactions\n- 필터 Chip 탭 → tickWeak 햅틱 + 즉시 필터 적용\n- 행 탭 → 상세로 이동, 히트 영역 44px 이상"
+  },
+  {
+    "id": "0017",
+    "title": "기록 상세 화면 `/history/:id`",
+    "epic": "Epic 2: 화면/컴포넌트",
+    "task": {
+      "description": "URL 파라미터의 id로 기록 1건을 찾아 상세 정보를 표시하고, 삭제(확인 다이얼로그)와 '다시 계산하기'(홈으로 prefill 전달)를 제공한다. id가 없거나 매칭 기록이 없으면 목록으로 replace 이동한다. 삭제 실패 시 낙관적 업데이트가 롤백되고 Toast를 노출한다.",
+      "acceptance_criteria": [
+        "존재하지 않는 id로 진입하면 navigate('/history', { replace: true })가 실행되고 렌더 예외가 없다",
+        "상세에 날짜·유형·관계·참석/동반·낸 금액·추천 금액·메모가 표시되고 알 수 없는 유형/관계는 '기타'로 폴백된다",
+        "삭제 탭 시 AlertDialog(왼쪽 버튼 '닫기', 오른쪽 '삭제하기')가 뜨고 확인 시 해당 1건만 제거된 뒤 '/history'로 이동하며 Toast '기록을 지웠어요' 노출",
+        "삭제 실패(ok:false) 시 목록 상태가 삭제 직전으로 복원되고 Toast '기록을 지우지 못했어요'가 노출된다",
+        "'다시 계산하기' 탭 시 navigate('/', { state: { prefill } })로 유형·관계·참석·동반·날짜가 전달된다"
+      ]
+    },
+    "covers": [
+      "F5 AC-3",
+      "F5 AC-4",
+      "F5 AC-8",
+      "F5 AC-9"
+    ],
+    "files": [
+      "src/pages/HistoryDetail.tsx"
+    ],
+    "definition_of_done": [
+      "tsc --noEmit 통과, vite build 성공",
+      "네비게이션 state는 RouteState 타입 사용"
+    ],
+    "depends_on": [],
+    "db_schema": "records: HistoryRecord[] → 'gyeongjo:v1:records'",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": "### Pattern\nDetailPanel + Confirm Dialog\n\n### TDS Components (whitelist)\nTop, ListRow, Border, Paragraph, Amount, Spacing, Button, AlertDialog, Toast\n\n### Layout\n<Top title={<Top.TitleParagraph>기록 상세</Top.TitleParagraph>} />\n<Spacing size={16} />\n<ListRow contents={<ListRow.Texts type=\"2RowTypeA\" top=\"낸 금액\" bottom=\"추천 100,000원\" />}\n  right={<Amount value={amount} unit=\"원\" typography=\"t4\" />} />\n<Border />\n<ListRow contents={<ListRow.Texts type=\"2RowTypeA\" top=\"결혼식 · 직장동료\" bottom=\"2026-08-12 · 참석 · 동반 1명\" />} />\n<ListRow contents={<ListRow.Texts type=\"2RowTypeA\" top=\"메모\" bottom={memo || '없어요'} />} />\n<Spacing size={24} />\n<div style={{ display: 'flex', gap: 8, padding: '0 16px' }}>\n  <Button variant=\"weak\" size=\"large\" onClick={onDelete}>삭제하기</Button>\n  <Button variant=\"fill\" size=\"large\" onClick={onRecalculate}>다시 계산하기</Button>\n</div>\n<Spacing size={24} />\n\n### States\n- Loading: 동기 조회 — 로딩 없음\n- Empty: 매칭 기록 없으면 '/history'로 replace\n- Error: 삭제 실패 시 롤백 + Toast\n\n### Interactions\n- 삭제 탭 → AlertDialog(왼쪽 '닫기') → 확인 시 삭제 + 목록 이동\n- 다시 계산 탭 → success 햅틱 + 홈으로 prefill 전달"
+  },
+  {
+    "id": "0018",
+    "title": "통계 화면 조립 `/stats`",
+    "epic": "Epic 2: 화면/컴포넌트",
+    "task": {
+      "description": "useRecords + aggregate로 요약 카드(총액/건수/평균)를 표시하고, 상세 차트는 RewardGate로 감싸 리워드 광고 시청 후 열리도록 조립한다. 기록이 0건이면 요약과 게이트 대신 빈 상태를 보여준다. StatsDetail·RewardGate는 import해 조립만 한다.",
+      "acceptance_criteria": [
+        "요약 카드에 총 지출·기록 수·평균 금액이 #,###원 포맷으로 표시되고 기록 0건이면 빈 상태(아이콘 + '아직 통계를 만들 기록이 없어요' + '계산하러 가기' Button)만 렌더된다",
+        "상세 차트 영역이 RewardGate로 감싸져 있고, 해제 전에는 StatsDetail 내용이 DOM에 노출되지 않는다",
+        "리워드 slotId env가 비어 있으면 게이트 없이 StatsDetail이 바로 표시되고 화면 나머지가 정상 동작한다",
+        "저장된 해제 시각이 미래이거나 NaN이면 잠금 상태로 표시되어 다시 광고 시청을 요구한다",
+        "하단 FloatingTabBar active='stats'가 표시되고 콘텐츠가 탭바에 가리지 않는다"
+      ]
+    },
+    "covers": [
+      "F6 AC-1",
+      "F6 AC-2",
+      "F6 AC-3",
+      "F6 AC-9"
+    ],
+    "files": [
+      "src/pages/Stats.tsx"
+    ],
+    "definition_of_done": [
+      "tsc --noEmit 통과, vite build 성공",
+      "StatsDetail/RewardGate는 import만 수행"
+    ],
+    "depends_on": [
+      "0010",
+      "0011"
+    ],
+    "db_schema": "records → 'gyeongjo:v1:records' / reward { lastUnlockedAt } → 'gyeongjo:v1:reward'",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": "### Pattern\nSummaryHero + Gated Detail\n\n### TDS Components (whitelist)\nTop, SummaryHero, Amount, ListRow, Paragraph, Border, Spacing, Button, Asset.ContentIcon, TossRewardAd, FloatingTabBar\n\n### Layout\n<Top title={<Top.TitleParagraph>통계</Top.TitleParagraph>} />\n<Spacing size={16} />\n<SummaryHero label=\"지금까지 낸 금액\" value={<Amount value={total} unit=\"원\" typography=\"t1\" />}\n  caption={`${count}건 · 평균 ${avgText}`} />\n<Spacing size={24} />\n<Border />\n<Spacing size={24} />\n{/* RewardGate로 감싼 StatsDetail */}\n<Spacing size={96} />\n<FloatingTabBar active=\"stats\" />\n\n### States\n- Loading: 요약 영역 TDS Skeleton 1회\n- Empty: 기록 0건 → Asset.ContentIcon + '아직 통계를 만들 기록이 없어요' + Button '계산하러 가기'\n- Error: 리워드 env 미주입 시 게이트 없이 상세 노출(빈 박스 금지)\n\n### Interactions\n- 광고 시청 완료 → success 햅틱 + 상세 즉시 노출\n- 요약 숫자는 #,###원 포맷"
+  },
+  {
+    "id": "0019",
+    "title": "앱 셸 조립 — 라우터 · 전역 Provider · 레이아웃 배선",
+    "epic": "4",
+    "task": {
+      "description": "App.tsx를 단독 소유해 BrowserRouter 라우트 5종(/, /result, /history, /history/:id, /stats, *)을 정의하고, RecordsProvider·AppErrorBoundary·OnboardingDialog를 전역 배선한다. 탭 루트 3화면은 AppLayout으로 감싸 FloatingTabBar를 공통 노출한다. main.tsx는 수정하지 않는다.",
+      "acceptance_criteria": [
+        "/ → Home, /result → Result, /history → History, /history/:id → HistoryDetail, /stats → Stats, * → NotFound 라우트가 모두 연결되어 각 경로 직접 진입 시 정상 렌더된다",
+        "탭 루트 3화면(/, /history, /stats)만 AppLayout으로 감싸지고 /result·/history/:id에는 탭바가 표시되지 않는다",
+        "RecordsProvider가 라우터 상위에 배치되어 모든 화면에서 useRecords가 동작하고, AppErrorBoundary가 라우트 전체를 감싼다",
+        "OnboardingDialog가 앱 최초 실행 시 1회만 표시된다",
+        "main.tsx 변경 0건(@AI:ANCHOR 보존), tsc --noEmit + vite build 통과, 각 경로 이동 시 콘솔 에러 0건"
+      ]
+    },
+    "covers": [
+      "F8 AC-1",
+      "F8 AC-2",
+      "F8 AC-4",
+      "F8 AC-5",
+      "F8 AC-6"
+    ],
+    "files": [
+      "src/App.tsx"
+    ],
+    "definition_of_done": [
+      "6개 경로 수동 이동 스모크 테스트 통과",
+      "tsc --noEmit, vite build 성공"
+    ],
+    "depends_on": [
+      "0012",
+      "0013",
+      "0014",
+      "0015",
+      "0016",
+      "0017",
+      "0018"
+    ],
+    "db_schema": "",
+    "api_contract": "",
+    "dependencies": [
+      "react-router-dom"
+    ],
+    "ui_requirements": "### Pattern\nAppShell (전역 오버레이 + 탭 레이아웃)\n\n### TDS Components (whitelist)\nAlertDialog(온보딩), Toast, FloatingTabBar(AppLayout 경유)\n\n### Layout\n<AppErrorBoundary>\n  <RecordsProvider>\n    <BrowserRouter>\n      <Routes>\n        <Route path=\"/\" element={<AppLayout active=\"calculate\"><Home /></AppLayout>} />\n        <Route path=\"/result\" element={<Result />} />\n        <Route path=\"/history\" element={<AppLayout active=\"history\"><History /></AppLayout>} />\n        <Route path=\"/history/:id\" element={<HistoryDetail />} />\n        <Route path=\"/stats\" element={<AppLayout active=\"stats\"><Stats /></AppLayout>} />\n        <Route path=\"*\" element={<NotFound />} />\n      </Routes>\n      <OnboardingDialog />\n    </BrowserRouter>\n  </RecordsProvider>\n</AppErrorBoundary>\n\n### States\n- Loading: 없음(모든 데이터 동기 로드)\n- Empty: 각 화면이 자체 처리\n- Error: 하위 렌더 예외는 AppErrorBoundary 폴백으로 대체\n\n### Interactions\n- 탭 전환은 AppLayout의 FloatingTabBar가 담당"
+  },
+  {
+    "id": "0020",
+    "title": "검수 정적 검증 + .env.example 문서화",
+    "epic": "Epic 3: 통합",
+    "task": {
+      "description": "검수 반려 요인을 자동으로 잡는 정적 스캔 테스트와 환경변수 문서를 추가한다. 금지 라이브러리(shadcn/MUI/Ant/Chakra/stripe/iamport/admob/kakao/naver/firebase-auth), HEX 색상 하드코딩, 광고 식별자 교차 전달, 광고 ID 리터럴 하드코딩, next/* import를 소스 전역에서 검사한다. 진입점 파일은 수정하지 않는다.",
+      "acceptance_criteria": [
+        "src/** 전역 스캔에서 금지 라이브러리 import 0건, 'next/' import 0건이 테스트로 검증된다",
+        "src/**에서 /#[0-9a-fA-F]{3,8}/ 형태의 색상 리터럴 0건(테스트/캔버스 렌더러의 흑백 고정값은 명시적 allowlist 처리)",
+        "AdSlot 호출부에 slotId prop, TossRewardAd 호출부에 adGroupId prop이 나타나지 않음을 스캔으로 검증한다",
+        "VITE_TOSS_AD_GROUP_ID / VITE_TOSS_AD_SLOT_ID 값이 import.meta.env 이외 경로로 등장하지 않음을 검증한다",
+        ".env.example에 VITE_TOSS_AD_GROUP_ID(배너/광고 그룹), VITE_TOSS_AD_SLOT_ID(리워드/슬롯) 두 항목이 용도 주석과 함께 기재되고 실제 값은 비어 있다"
+      ]
+    },
+    "covers": [
+      "F8 AC-7",
+      "F8 AC-8",
+      "F8 AC-9",
+      "F8 AC-10"
+    ],
+    "files": [
+      "src/__tests__/compliance.scan.test.ts",
+      ".env.example"
+    ],
+    "definition_of_done": [
+      "vitest 통과, tsc --noEmit, vite build 성공",
+      "App.tsx/main.tsx 변경 0건"
+    ],
+    "depends_on": [
+      "0019"
+    ],
+    "db_schema": "",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": ""
+  }
+]
