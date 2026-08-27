@@ -147,3 +147,83 @@ CRITICAL: Before creating any new function, type, or component, check the list a
 
 ## Already Implemented (do NOT duplicate or overwrite)
 - 0001: 도메인 타입·열거형·RouteState 선언 (files: src/domain/types.ts, src/lib/types.ts)
+
+## Available exports from existing files
+// src/App.tsx
+export default function App() {
+
+// src/components/AdSlot.tsx
+export function AdSlot({ adGroupId, className, variant, theme }: AdSlotProps) {
+
+// src/components/Amount.tsx
+export function Amount({
+
+// src/components/BottomCTA.tsx
+export function SubmitFooter({
+export function ButtonStack({
+
+// src/components/Card.tsx
+export function Card({
+
+// src/components/CountUp.tsx
+export function CountUp({
+
+// src/components/FloatingTabBar.tsx
+export type TabItem = {
+export function FloatingTabBar({ items }: { items: TabItem[] }) {
+
+// src/components/MiniBar.tsx
+export function MiniBar({
+
+// src/components/PageShell.tsx
+export function PageShell({ children, style }: { children: ReactNode; style?: CSSProperties }) {
+
+// src/components/ScreenScaffold.tsx
+export function ScreenScaffold({
+
+// src/components/Sparkline.tsx
+export function Sparkline({
+
+// src/components/StateView.tsx
+export function EmptyState({
+export function LoadingState({
+
+// src/components/SummaryHero.tsx
+export function SummaryHero({
+
+// src/components/TossPurchase.tsx
+export interface TossPurchaseResult {
+export function TossPurchase({
+
+// src/components/TossRewardAd.tsx
+export function TossRewardAd({
+
+// src/domain/types.ts
+export const EVENT_TYPES = ["WEDDING", "FUNERAL", "FIRST_BIRTHDAY", "OPENING"] as const;
+export type EventType = (typeof EVENT_TYPES)[number];
+export type StoredEventType = EventType | (string & {});
+export const RELATIONS = ["FAMILY", "RELATIVE", "CLOSE_FRIEND", "FRIEND", "COWORKER", "ACQUAINTANCE"] as const;
+export type Relation = (typeof RELATIONS)[number];
+export type StoredRelation = Relation | (string & {});
+export type HistoryRecord = {
+export type CalculationInput = {
+export type CalculationResult = {
+export type StorageResult<T> =
+
+// src/lib/contract.ts
+export type {
+export type { RouteState } from "@/lib/types";
+export type StorageKeys = {
+export type AdGroupId = string; // <AdSlot adGroupId={import.meta.env.VITE_TOSS_AD_GROUP_ID} />
+export type AdSlotId = string;
+
+## Memory Index (자동 학습 — 힌트로만 사용, 실제 코드 확인 필수)
+
+Available topics: deploy(1), general(8)
+
+Key lessons (verify against actual code before applying):
+- [general] 의존 그래프 최하층의 타입·계약 파일은 런타임 코드 0줄의 순수 선언으로 가장 먼저 단독 타입체크를 통과시키고, 파일 생성은 셸 명령이 아닌 허용된 편집 도구로만 하게 강제하라. (60% · 타 앱 1회 — 맹신 금지)
+- [general] 영속 저장소에서 읽은 값은 항상 스키마 기본값으로 정규화해 배열·객체 타입을 보장한 뒤 반환하고, 화면은 빈/손상/부분 데이터에서도 렌더되도록 방어하라. (60% · 타 앱 1회 — 맹신 금지)
+- [general] 정책·기능 제거형 리팩터링은 화면과 도메인 로직 레이어에서만 수행하고, package.json의 플랫폼 필수 의존성(디자인 시스템·플랫폼 SDK·프레임워크 코어)은 어떤 경우에도 삭제하지 말 것 — 필수 패키지 화이트리스트를 빌드 전 가드로 검증하라. (60% · 타 앱 1회 — 맹신 금지)
+- [general] 공용 기반 모듈(상수·저장소·계산 유틸)이 실제로 머지되기 전에는 이를 import하는 화면·훅 패킷을 머지하지 말고, 모든 머지 게이트에 타입체크와 프로덕션 빌드 통과(미해결 import 0건)를 필수로 걸어라. (60% · 타 앱 1회 — 맹신 금지)
+- [general] 라우팅·Provider·전역 레이아웃 같은 단일 통합 배선 책임은 하나의 워크패킷에만 할당하고, 다른 패킷은 그 위에 페이지 내부 요소만 얹도록 경계를 명확히 나눠라. (60% · 타 앱 1회 — 맹신 금지)

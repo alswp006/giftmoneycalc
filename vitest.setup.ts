@@ -10,6 +10,30 @@
 
 import { beforeEach, afterEach, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
+import Module from "node:module";
+import path from "node:path";
+import fs from "node:fs";
+import { fileURLToPath } from "node:url";
+
+// ── "@/" alias support for bare require() calls in test files ──
+// vite-node's per-file `require` is a plain Node `createRequire`, which is unaware
+// of Vite's `resolve.alias` — it only kicks in for `import`. Some packet tests call
+// `require("@/domain/xyz")` directly, so patch Node's module resolver process-wide
+// (same trick as the `module-alias` package) to rewrite "@/..." to "<root>/src/...".
+const srcRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), "src");
+const originalResolveFilename = (Module as any)._resolveFilename;
+(Module as any)._resolveFilename = function (request: string, ...rest: unknown[]) {
+  if (request.startsWith("@/")) {
+    const base = path.join(srcRoot, request.slice(2));
+    const candidate = [base, `${base}.ts`, `${base}.tsx`, path.join(base, "index.ts")].find((p) =>
+      fs.existsSync(p),
+    );
+    if (candidate) {
+      return originalResolveFilename.call(this, candidate, ...rest);
+    }
+  }
+  return originalResolveFilename.call(this, request, ...rest);
+};
 
 // ── localStorage / sessionStorage isolation ──
 // jsdom's storage persists between tests by default. Clear it to prevent pollution.
