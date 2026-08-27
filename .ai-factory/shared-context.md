@@ -101,6 +101,7 @@ export type RouteState = {
     TossPurchase.tsx
     TossRewardAd.tsx
   domain/
+    rules.ts
     types.ts
   hooks/
   lib/
@@ -112,6 +113,8 @@ export type RouteState = {
   pages/
     Home.tsx
     __TdsGallery.tsx
+  storage/
+    keys.ts
   styles/
     globals.css
     reward-ad.css
@@ -147,6 +150,7 @@ CRITICAL: Before creating any new function, type, or component, check the list a
 
 ## Already Implemented (do NOT duplicate or overwrite)
 - 0001: 도메인 타입·열거형·RouteState 선언 (files: src/domain/types.ts, src/lib/types.ts)
+- 0002: 룰 테이블 상수 · 저장소 키 · Envelope 타입 (files: src/domain/rules.ts, src/storage/keys.ts)
 
 ## Available exports from existing files
 // src/App.tsx
@@ -198,6 +202,14 @@ export function TossPurchase({
 // src/components/TossRewardAd.tsx
 export function TossRewardAd({
 
+// src/domain/rules.ts
+export const BASE_AMOUNT: Record<EventType, number> = Object.freeze({
+export const RELATION_MULTIPLIER: Record<Relation, number> = Object.freeze({
+export const MEAL_COST: Record<EventType, number> = Object.freeze({
+export const MIN_AMOUNT = 30000 as const;
+export const MAX_AMOUNT = 1000000 as const;
+export const RULE_VERSION = 1 as const;
+
 // src/domain/types.ts
 export const EVENT_TYPES = ["WEDDING", "FUNERAL", "FIRST_BIRTHDAY", "OPENING"] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
@@ -205,17 +217,7 @@ export type StoredEventType = EventType | (string & {});
 export const RELATIONS = ["FAMILY", "RELATIVE", "CLOSE_FRIEND", "FRIEND", "COWORKER", "ACQUAINTANCE"] as const;
 export type Relation = (typeof RELATIONS)[number];
 export type StoredRelation = Relation | (string & {});
-export type HistoryRecord = {
-export type CalculationInput = {
-export type CalculationResult = {
-export type StorageResult<T> =
-
-// src/lib/contract.ts
-export type {
-export type { RouteState } from "@/lib/types";
-export type StorageKeys = {
-export type AdGroupId = string; // <AdSlot adGroupId={import.meta.env.VITE_TOSS_AD_GROUP_ID} />
-export type AdSlotId = string;
+ex
 
 ## Memory Index (자동 학습 — 힌트로만 사용, 실제 코드 확인 필수)
 
