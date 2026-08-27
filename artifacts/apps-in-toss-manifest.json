@@ -1,0 +1,22 @@
+{
+  "koreanName": "경조금계산기",
+  "englishName": "GiftMoneyCalc",
+  "appName": "gift-money-calc",
+  "ageRating": "전체",
+  "supportEmail": "support@aifactory.dev",
+  "category": {
+    "primary": "생활"
+  },
+  "subtitle": "축의금·부의금 적정액 3초 계산",
+  "description": "경조사 초대장을 받을 때마다 축의금·부의금 액수를 검색하고 고민하던 불편함을 해결합니다. 관계(직장동료·친구·친인척)와 친밀도, 행사 종류를 선택하면 지역·물가를 반영한 적정 금액이 바로 나타납니다. 이전 기록을 저장해 누구에게 얼마를 줬는지 확인할 수 있고, 평균·분포 통계로 당신의 패턴을 분석해줍니다. 추천 금액은 카드뉴스로 공유할 수도 있습니다.",
+  "searchKeywords": [
+    "축의금",
+    "부의금",
+    "경조금",
+    "결혼식",
+    "장례식",
+    "경조사",
+    "선물 금액",
+    "물가 계산기"
+  ]
+}
