@@ -1,10 +1,11 @@
-import { readEnvelope, writeEnvelope } from "@/storage/envelope";
-import { newUuid } from "@/storage/uuid";
-import { STORAGE_KEYS } from "@/storage/keys";
 import type { HistoryRecord, StorageResult } from "@/lib/types";
+import { readEnvelope, writeEnvelope } from "@/storage/envelope";
+import { SCHEMA_VERSION, STORAGE_KEYS } from "@/storage/keys";
 import type { RecordsEnvelope } from "@/storage/keys";
+import { newUuid } from "@/storage/uuid";
 
-const RECORD_LIMIT = 500;
+const MAX_RECORDS = 500;
+
 const REQUIRED_FIELDS = [
   "eventType",
   "relation",
@@ -16,170 +17,91 @@ const REQUIRED_FIELDS = [
   "ruleVersion",
 ] as const;
 
-function isoNow(): string {
-  return new Date().toISOString();
+type SaveRecordInput = Omit<HistoryRecord, "id" | "createdAt" | "updatedAt">;
+type UpdateRecordPatch = Partial<Omit<HistoryRecord, "id" | "createdAt">>;
+
+function emptyEnvelope(): RecordsEnvelope {
+  return { schemaVersion: SCHEMA_VERSION, updatedAt: new Date().toISOString(), records: [] };
 }
 
-function validateRecord(input: Partial<HistoryRecord>): { ok: true } | { ok: false; field: string } {
+async function readRecords(): Promise<HistoryRecord[]> {
+  const result = await readEnvelope<RecordsEnvelope>(STORAGE_KEYS.records, emptyEnvelope());
+  if (!result.ok) return [];
+  return Array.isArray(result.value.records) ? result.value.records : [];
+}
+
+async function writeRecords(records: HistoryRecord[]): Promise<StorageResult<null>> {
+  const result = await writeEnvelope<RecordsEnvelope>(STORAGE_KEYS.records, {
+    schemaVersion: SCHEMA_VERSION,
+    updatedAt: new Date().toISOString(),
+    records,
+  });
+  if (!result.ok) {
+    return { ok: false, code: result.code === "QUOTA_EXCEEDED" ? "QUOTA_EXCEEDED" : "CORRUPTED" };
+  }
+  return { ok: true, value: null };
+}
+
+export async function saveRecord(input: SaveRecordInput): Promise<StorageResult<HistoryRecord>> {
   for (const field of REQUIRED_FIELDS) {
-    const value = input[field as keyof typeof input];
+    const value = (input as Record<string, unknown>)[field];
     if (value === undefined || value === null) {
-      return { ok: false, field };
+      return { ok: false, code: "INVALID_RECORD", field };
     }
   }
-  return { ok: true };
-}
 
-export async function saveRecord(
-  input: Partial<HistoryRecord>
-): Promise<StorageResult<HistoryRecord>> {
-  const validation = validateRecord(input);
-  if (!validation.ok) {
-    return {
-      ok: false,
-      code: "INVALID_RECORD",
-      field: validation.field,
-    };
-  }
-
-  const fallback: RecordsEnvelope = {
-    schemaVersion: 1,
-    updatedAt: isoNow(),
-    records: [],
-  };
-
-  const envelope = await readEnvelope(STORAGE_KEYS.records, fallback);
-  if (!envelope.ok) {
-    return { ok: false, code: envelope.code };
-  }
-
-  const records = envelope.value.records;
-
-  if (records.length >= RECORD_LIMIT) {
+  const records = await readRecords();
+  if (records.length >= MAX_RECORDS) {
     return { ok: false, code: "RECORD_LIMIT_EXCEEDED" };
   }
 
-  const now = isoNow();
+  const now = new Date().toISOString();
   const record: HistoryRecord = {
+    ...input,
     id: newUuid(),
-    eventType: input.eventType!,
-    relation: input.relation!,
-    amount: input.amount!,
-    recommendedAmount: input.recommendedAmount!,
-    attended: input.attended!,
-    companions: input.companions!,
-    eventDate: input.eventDate!,
-    ruleVersion: input.ruleVersion!,
-    counterpartLabel: input.counterpartLabel,
-    memo: input.memo,
     createdAt: now,
     updatedAt: now,
   };
 
-  records.push(record);
-
-  const updated: RecordsEnvelope = {
-    ...envelope.value,
-    updatedAt: now,
-    records,
-  };
-
-  const writeResult = await writeEnvelope(STORAGE_KEYS.records, updated);
-  if (!writeResult.ok) {
-    return { ok: false, code: writeResult.code };
-  }
+  const writeResult = await writeRecords([...records, record]);
+  if (!writeResult.ok) return writeResult;
 
   return { ok: true, value: record };
 }
 
-export async function updateRecord(
-  id: string,
-  patch: Partial<HistoryRecord>
-): Promise<StorageResult<HistoryRecord>> {
-  const fallback: RecordsEnvelope = {
-    schemaVersion: 1,
-    updatedAt: isoNow(),
-    records: [],
-  };
-
-  const envelope = await readEnvelope(STORAGE_KEYS.records, fallback);
-  if (!envelope.ok) {
-    return { ok: false, code: envelope.code };
+export async function updateRecord(id: string, patch: UpdateRecordPatch): Promise<StorageResult<HistoryRecord>> {
+  const records = await readRecords();
+  const index = records.findIndex((r) => r.id === id);
+  if (index === -1) {
+    return { ok: false, code: "INVALID_RECORD", field: "id" };
   }
 
-  const records = envelope.value.records;
-  const recordIndex = records.findIndex((r) => r.id === id);
-
-  if (recordIndex === -1) {
-    return { ok: false, code: "CORRUPTED" };
-  }
-
-  const existing = records[recordIndex];
-  const now = isoNow();
-
+  const { id: _ignoredId, createdAt: _ignoredCreatedAt, ...safePatch } = patch as Record<string, unknown>;
+  const original = records[index];
   const updated: HistoryRecord = {
-    ...existing,
-    ...patch,
-    id: existing.id,
-    createdAt: existing.createdAt,
-    updatedAt: now,
+    ...original,
+    ...safePatch,
+    id: original.id,
+    createdAt: original.createdAt,
+    updatedAt: new Date().toISOString(),
   };
 
-  records[recordIndex] = updated;
+  const nextRecords = [...records];
+  nextRecords[index] = updated;
 
-  const writeResult = await writeEnvelope(STORAGE_KEYS.records, {
-    ...envelope.value,
-    updatedAt: now,
-    records,
-  });
-
-  if (!writeResult.ok) {
-    return { ok: false, code: writeResult.code };
-  }
+  const writeResult = await writeRecords(nextRecords);
+  if (!writeResult.ok) return writeResult;
 
   return { ok: true, value: updated };
 }
 
-export async function deleteRecord(id: string): Promise<StorageResult<void>> {
-  const fallback: RecordsEnvelope = {
-    schemaVersion: 1,
-    updatedAt: isoNow(),
-    records: [],
-  };
-
-  const envelope = await readEnvelope(STORAGE_KEYS.records, fallback);
-  if (!envelope.ok) {
-    return { ok: false, code: envelope.code };
-  }
-
-  const records = envelope.value.records;
-  const filtered = records.filter((r) => r.id !== id);
-
-  const now = isoNow();
-  const writeResult = await writeEnvelope(STORAGE_KEYS.records, {
-    ...envelope.value,
-    updatedAt: now,
-    records: filtered,
-  });
-
-  if (!writeResult.ok) {
-    return { ok: false, code: writeResult.code };
-  }
-
-  return { ok: true, value: undefined };
+export async function deleteRecord(id: string): Promise<StorageResult<null>> {
+  const records = await readRecords();
+  const nextRecords = records.filter((r) => r.id !== id);
+  return writeRecords(nextRecords);
 }
 
 export async function listRecords(): Promise<StorageResult<HistoryRecord[]>> {
-  const fallback: RecordsEnvelope = {
-    schemaVersion: 1,
-    updatedAt: isoNow(),
-    records: [],
-  };
-
-  const envelope = await readEnvelope(STORAGE_KEYS.records, fallback);
-  if (!envelope.ok) {
-    return { ok: true, value: [] };
-  }
-
-  return { ok: true, value: envelope.value.records };
+  const records = await readRecords();
+  return { ok: true, value: records };
 }
