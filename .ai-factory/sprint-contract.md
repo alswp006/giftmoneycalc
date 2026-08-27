@@ -1,23 +1,20 @@
-# Sprint Contract: CalculateForm 컴포넌트
+# Sprint Contract: 온보딩 다이얼로그 + 에러 바운더리
 
 ## 만들 항목
-- **파일**: `src/components/CalculateForm.tsx`
-- **역할**: 계산 입력 폼의 순수 프레젠테이션 컴포넌트 (제어 컴포넌트)
-- **구성**: 행사 유형 Chip 4종 + 관계 Chip 6종 + 참석 Switch + 동반 인원 TextField + 행사 날짜 TextField
-- **props**: `value: CalculationInput` + `onChange: (input: Partial<CalculationInput>) => void`
+- **`src/components/OnboardingDialog.tsx`**: AlertDialog 래퍼. 'gyeongjo:v1:onboarded' 플래그 없으면 마운트 시 참고용 금액 안내 AlertDialog 1회 노출. 닫으면 플래그 저장 후 children 렌더.
+- **`src/components/AppErrorBoundary.tsx`**: 클래스형 에러 바운더리. 자식 컴포넌트 렌더 예외 캐치 → 복구 버튼(새로고침) + 에러 메시지 표시. App.tsx 배선은 다음 패킷.
 
 ## 사용할 TypeScript 타입
-- `import type { CalculationInput, EventType, Relation } from "@/lib/types"`
-- `import { EVENT_TYPES, RELATIONS } from "@/lib/types"`
+- `import type { CalculationInput, RouteState } from "@/lib/types"`
+- `import { localStorage 헬퍼 } from "@/lib/storage"` (이미 존재)
 
 ## 검증 방법
 - `npx tsc --noEmit` — 타입 에러 0건
-- `npx vitest run` — 폼 액션 테스트(선택, 입력 필드 업데이트, 라벨링)
-- `npm run test:visual` — 각 입력 요소가 시각적으로 정상인지 확인 (Chip 선택 상태, Switch, TextField placeholder)
+- `npx vitest run` — 다이얼로그 1회 노출 + 플래그 저장 테스트, 에러 바운더리 예외 캐치 테스트
+- `npm run test:visual` — 다이얼로그 렌더, 닫기 버튼 클릭 시 사라짐 확인
 
 ## 절대 하면 안 되는 것
-- 라우팅/navigate 호출 금지 → 값 변경만
-- 저장소(localStorage/SDK) 접근 금지 → props로만 제어
-- 하단 고정 CTA 렌더 금지 → 조립 화면이 소유
-- TDS 컴포넌트 마진/패딩 오버라이드 금지 → Spacing으로만 간격 생성
-- 버튼 중첩 금지 (`<button>` 안에 `<Button>` 금지) → CTA는 조립 화면에서
+- main.tsx 수정 금지 → 다음 통합 패킷에서 App.tsx에 배선
+- App.tsx 수정 금지 → 다음 통합 패킷에서 통합
+- localStorage 키명 다름 (반드시 'gyeongjo:v1:onboarded' 사용)
+- 다이얼로그 children(페이지)를 막거나 숨기지 말 것 → 닫기 후 항상 렌더
