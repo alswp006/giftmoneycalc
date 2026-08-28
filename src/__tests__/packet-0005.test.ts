@@ -316,21 +316,6 @@ describe("설정 저장 계층 (확인 후 반영 · 리워드 24시간 해제)"
         expect((result as Extract<Result<AppSettings>, { ok: false }>).error.code).toBe(422);
       }
     });
-
-    it("settings.test.ts: 6 케이스 검증 (AC-4 총 6개 테스트 필수)", () => {
-      // This test documents that AC-4 requires exactly 6 test cases
-      // Count:
-      // 1. saveSettings should reject invalid region with code 422
-      // 2. saveSettings should preserve settings when invalid region is rejected (422)
-      // 3. saveSettings should accept all valid region values
-      // 4. saveSettings should validate region when used alone (partial update)
-      // 5. saveSettings should reject multiple invalid regions with 422 code
-      // 6. [This test itself as a summary/documentation test]
-
-      const testCount = 6;
-      expect(testCount).toBeGreaterThan(0);
-      expect(testCount).toBe(6);
-    });
   });
 
   describe("Integration: 설정 저장, 리워드 해제, 조회 워크플로우", () => {
@@ -435,9 +420,10 @@ describe("설정 저장 계층 (확인 후 반영 · 리워드 24시간 해제)"
       settings = getSettings();
       expect(settings.rewardUnlockedUntil).toBe(now2 + TWENTY_FOUR_HOURS);
 
-      // Check reward status at a time between the two unlocks
+      // checkTime is past the first unlock's window, but the second unlock
+      // overwrote rewardUnlockedUntil to now2 + 24h (a later time) — still active.
       const checkTime = now1 + TWENTY_FOUR_HOURS + 1;
-      expect(isRewardUnlocked(checkTime)).toBe(false); // Expired from first unlock
+      expect(isRewardUnlocked(checkTime)).toBe(true);
     });
   });
 });

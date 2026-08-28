@@ -25,8 +25,9 @@ function writeJson(key: string, value: unknown): Result<void> {
   try {
     localStorage.setItem(key, JSON.stringify(value));
     return ok(undefined);
-  } catch {
-    return fail(507);
+  } catch (err) {
+    const code = err instanceof Error && err.name === "QuotaExceededError" ? 507 : 500;
+    return fail(code);
   }
 }
 
