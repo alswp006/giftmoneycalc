@@ -1,10 +1,29 @@
+import { useCallback, useEffect, useState } from "react";
 import type { GiftRecord } from "@/lib/types";
+import { queryRecords, subscribeRecords } from "@/lib/records";
 
-// TDD Red Phase: Stub implementation
 export function useRecords(): {
   records: GiftRecord[];
   loading: boolean;
   reload: () => void;
 } {
-  throw new Error("Not implemented");
+  const [records, setRecords] = useState<GiftRecord[]>(() => queryRecords());
+  const [loading, setLoading] = useState(true);
+
+  const reload = useCallback(() => {
+    setRecords(queryRecords());
+  }, []);
+
+  useEffect(() => {
+    setRecords(queryRecords());
+    setLoading(false);
+
+    const unsubscribe = subscribeRecords((next) => {
+      setRecords(next);
+    });
+
+    return unsubscribe;
+  }, []);
+
+  return { records, loading, reload };
 }

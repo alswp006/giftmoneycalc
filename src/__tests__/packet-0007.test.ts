@@ -4,6 +4,7 @@ import React from "react";
 import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import type { GiftRecord, StatsSummary } from "@/lib/types";
+import * as recordsModule from "@/lib/records";
 
 /**
  * Packet 0007 — 통계 집계 함수 + 상태 관리 훅 (useRecords · useSettings)
@@ -22,12 +23,12 @@ import type { GiftRecord, StatsSummary } from "@/lib/types";
 let mockListeners: Set<(records: GiftRecord[]) => void> = new Set();
 
 vi.mock("@/lib/records", () => ({
-  subscribeRecords: (cb: (records: GiftRecord[]) => void) => {
+  subscribeRecords: vi.fn((cb: (records: GiftRecord[]) => void) => {
     mockListeners.add(cb);
     return () => {
       mockListeners.delete(cb);
     };
-  },
+  }),
   createRecord: vi.fn(),
   updateRecord: vi.fn(),
   deleteRecord: vi.fn(),
@@ -516,7 +517,7 @@ describe("AC-5+: useRecords unsubscribes on unmount (callback not called after u
     let unsubscribeFn: (() => void) | null = null;
 
     // Intercept subscribeRecords to capture unsubscribe function
-    vi.mocked(require("@/lib/records")).subscribeRecords.mockImplementationOnce(
+    vi.mocked(recordsModule).subscribeRecords.mockImplementationOnce(
       (cb: (records: GiftRecord[]) => void) => {
         mockListeners.add(cb);
         const unsubscribe = () => {
