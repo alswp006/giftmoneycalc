@@ -1,73 +1,156 @@
-import { Top, Paragraph, Spacing, ListRow, Button } from '@toss/tds-mobile';
+import { useEffect, useMemo, useState } from 'react';
+import { Top, Paragraph, Spacing, ListRow, Button, Chip, Toast } from '@toss/tds-mobile';
 import { useNavigate } from 'react-router-dom';
-import { ScreenScaffold } from '../components/ScreenScaffold';
-import { SummaryHero } from '../components/SummaryHero';
-import { Card } from '../components/Card';
+import { generateHapticFeedback } from '@apps-in-toss/web-framework';
+import { ScreenScaffold } from '@/components/ScreenScaffold';
+import { SummaryHero } from '@/components/SummaryHero';
+import { CountUp } from '@/components/CountUp';
+import { Amount } from '@/components/Amount';
+import { Card } from '@/components/Card';
+import { EmptyState, LoadingState } from '@/components/StateView';
+import { AdSlot } from '@/components/AdSlot';
+import { FloatingTabBar } from '@/components/FloatingTabBar';
+import { useRecords } from '@/hooks/useRecords';
+import { getErrorMessage } from '@/lib/errors';
+import { EVENT_TYPE_LABEL } from '@/lib/rules';
+import type { EventType, GiftRecord, RouteState } from '@/lib/types';
 
-/**
- * Golden Home page — 대시보드/탭-루트 골든 레퍼런스.
- *
- * 다른 페이지를 쓸 때 이 패턴을 모방하라:
- * - ScreenScaffold로 감싼다(raw fragment 골격 금지) — safe-area + 100dvh 자동 처리.
- * - 화면 최상단에 SummaryHero로 시각 앵커를 만든다('휑함'의 가장 큰 원인은 앵커 부재).
- *   데이터가 있으면 value에 <Amount value={n} unit="원" typography="t1" />로 핵심 숫자를 크게 박아라.
- * - 1차 진입 액션은 SummaryHero 카드 내부 버튼(display="block", 전체폭)에 둔다.
- *   → 화면 중앙 부유/좌측 글자폭 버튼 금지. 하단 TabBar가 있으면 SubmitFooter와 겹치므로 카드 안에.
- * - 핵심 정보는 raw <div>가 아니라 Card로 묶어 위계를 만든다.
- * - 하단 탭이 필요하면(2~5탭): bottom={<FloatingTabBar items={[{label,path}...]} />}.
- *   ('TDS TabBar'는 존재하지 않는다 — 직접 만들지 말고 FloatingTabBar를 써라.)
- * - 카피는 CLAUDE.md "카피 규칙 — AI 냄새 금지"를 따른다: 기능 나열식 홍보 문구·상투구·
- *   generic 버튼("시작하기") 금지. 이 파일의 예시 문구도 앱 맥락에 맞게 교체 대상이다.
- *
- * Scaffold tokens (replaced by scaffold-toss.ts at project creation):
- *   GiftMoneyCalc -> the app's display name
- *   관계·지역·물가를 반영해 축의금·부의금 적정 금액을 알려주는 계산기    -> the one-line description
- */
+const QUICK_EVENTS: EventType[] = ['wedding', 'funeral', 'firstBirthday'];
 
-// ⚠ 이 목록은 골격 예시다 — 앱의 실제 콘텐츠(핵심 지표·최근 기록·바로가기)로 반드시 교체하라.
-// '간편한 사용/빠른 처리' 같은 기능 나열식 홍보 문구는 카피 규칙(CLAUDE.md "AI 냄새 금지") 위반이다.
-// 사용자가 이 화면에서 실제로 확인할 정보를 넣어라 — 아래처럼 데이터가 사는 행으로.
-const HIGHLIGHTS = [
-  { title: '오늘', description: '아직 기록이 없어요' },
-  { title: '이번 주', description: '기록 3건 · 평균 12분' },
+const TABS = [
+  { label: '홈', path: '/' },
+  { label: '기록', path: '/history' },
+  { label: '설정', path: '/settings' },
 ];
+
+function currentMonthKey(now = new Date()): string {
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function safeHaptic(type: 'success' | 'tickWeak') {
+  try {
+    Promise.resolve(generateHapticFeedback({ type })).catch(() => {});
+  } catch {
+    /* WebView 밖에서는 throw — 무시 */
+  }
+}
 
 export default function Home() {
   const navigate = useNavigate();
+  const { records, loading } = useRecords();
+  const [toastOpen, setToastOpen] = useState(false);
+
+  const { monthTotal, monthCount, recent, hadError } = useMemo(() => {
+    try {
+      const monthKey = currentMonthKey();
+      const monthRecords = records.filter((r) => r.eventDate.slice(0, 7) === monthKey);
+      const total = monthRecords.reduce((sum, r) => sum + r.amount, 0);
+      return { monthTotal: total, monthCount: monthRecords.length, recent: records.slice(0, 3), hadError: false };
+    } catch {
+      return { monthTotal: 0, monthCount: 0, recent: [] as GiftRecord[], hadError: true };
+    }
+  }, [records]);
+
+  useEffect(() => {
+    if (hadError) setToastOpen(true);
+  }, [hadError]);
+
+  const goCalc = () => {
+    safeHaptic('success');
+    navigate('/calc');
+  };
+
+  const goCalcWithEvent = (eventType: EventType) => {
+    safeHaptic('tickWeak');
+    navigate('/calc', { state: { prefill: { eventType } } as RouteState['/calc'] });
+  };
+
+  const goDetail = (id: string) => {
+    navigate('/history/' + id);
+  };
+
+  const adGroupId = import.meta.env.VITE_TOSS_AD_GROUP_ID as string | undefined;
 
   return (
     <ScreenScaffold
-      top={<Top title={<Top.TitleParagraph>GiftMoneyCalc</Top.TitleParagraph>} />}
+      top={<Top title={<Top.TitleParagraph>경조사비 계산기</Top.TitleParagraph>} />}
+      bottom={<FloatingTabBar items={TABS} />}
     >
-      {/* 시각 앵커: 헤드라인 + 카드 내 진입 버튼(부유 금지, display="block" 전체폭).
-          데이터 앱이면 value를 <Amount typography="t1" />(핵심 숫자)로 교체하라. */}
       <SummaryHero
-        label="GiftMoneyCalc"
-        value={<Paragraph.Text typography="t2">관계·지역·물가를 반영해 축의금·부의금 적정 금액을 알려주는 계산기</Paragraph.Text>}
-        caption="로그인 없이 바로 쓸 수 있어요"
-        action={
-          // 라벨은 앱의 핵심 행동 동사로 교체하라 — "연봉 계산하기"/"기록 남기기" 등.
-          // generic "시작하기"/"확인"은 카피 규칙 위반. onClick도 실제 첫 화면 경로로.
-          <Button variant="fill" display="block" onClick={() => navigate('/')}>
-            첫 결과 보기
-          </Button>
-        }
+        label="이번 달 경조사비"
+        value={<CountUp value={monthTotal} unit="원" typography="t1" />}
+        caption={`${monthCount}건 기록했어요`}
         testId="home-hero"
       />
 
+      <Spacing size={12} />
+
+      <Button variant="fill" display="block" size="large" onClick={goCalc}>
+        권장 금액 계산하기
+      </Button>
+
       <Spacing size={24} />
 
-      {/* 핵심 정보는 Card로 묶기(raw div 금지) — 위계 생성 */}
-      <Card testId="home-highlights">
-        {HIGHLIGHTS.map((h, idx) => (
-          <ListRow
-            key={idx}
-            contents={<ListRow.Texts type="2RowTypeA" top={h.title} bottom={h.description} />}
-          />
+      <Paragraph.Text typography="t4">바로 계산</Paragraph.Text>
+      <Spacing size={12} />
+      <div style={{ display: 'flex', gap: 8, overflowX: 'auto' }}>
+        {QUICK_EVENTS.map((type) => (
+          <Chip key={type} variant="weak" onClick={() => goCalcWithEvent(type)}>
+            {EVENT_TYPE_LABEL[type]}
+          </Chip>
         ))}
-      </Card>
+      </div>
 
       <Spacing size={24} />
+
+      <Paragraph.Text typography="t4">최근 기록</Paragraph.Text>
+      <Spacing size={12} />
+      {loading ? (
+        <LoadingState rows={3} testId="home-recent-loading" />
+      ) : recent.length === 0 ? (
+        <EmptyState
+          testId="home-recent-empty"
+          title="아직 기록이 없어요"
+          description="계산하고 바로 기록해 보세요"
+          action={
+            <Button variant="weak" display="block" onClick={goCalc}>
+              계산하기
+            </Button>
+          }
+        />
+      ) : (
+        <Card testId="home-recent-card">
+          {recent.map((r, idx) => (
+            <div key={r.id}>
+              {idx > 0 ? <Spacing size={8} /> : null}
+              <ListRow
+                data-testid="home-recent-record"
+                data-record-id={r.id}
+                contents={
+                  <ListRow.Texts
+                    type="2RowTypeA"
+                    top={`${r.personName} · ${EVENT_TYPE_LABEL[r.eventType]}`}
+                    bottom={r.eventDate.replace(/-/g, '.')}
+                  />
+                }
+                right={<Amount value={r.amount} unit="원" typography="st11" />}
+                onClick={() => goDetail(r.id)}
+              />
+            </div>
+          ))}
+        </Card>
+      )}
+
+      <Spacing size={16} />
+      {adGroupId ? <AdSlot adGroupId={adGroupId} /> : null}
+      <Spacing size={80} />
+
+      <Toast
+        open={toastOpen}
+        position="bottom"
+        text={getErrorMessage(500)}
+        onClose={() => setToastOpen(false)}
+      />
     </ScreenScaffold>
   );
 }
