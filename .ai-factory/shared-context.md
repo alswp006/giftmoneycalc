@@ -201,7 +201,9 @@ export type RouteState = {
     utils.ts
   main.tsx
   pages/
+    Calc.tsx
     Home.tsx
+    Result.tsx
     __TdsGallery.tsx
   styles/
     globals.css
@@ -245,7 +247,7 @@ export type RouteState = {
   lib/errors.ts → imports: lib/types
   lib/records.ts → imports: lib/types, lib/errors, lib/storage
   lib/rules.ts → imports: lib/types
-  lib/settings.ts → imports: lib/types, lib/contract, lib/error...
+  lib/settings.ts → imports: lib/ty...
 CRITICAL: Before creating any new function, type, or component, check the list above. If something similar exists, import and use it.
 
 ## Already Implemented (do NOT duplicate or overwrite)
