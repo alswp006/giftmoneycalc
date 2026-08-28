@@ -142,8 +142,8 @@ export function mockTds() {
 
     // FixedBottomCTA is itself a <button> (see src/components/BottomCTA.tsx SubmitFooter) —
     // mocked as a plain button so onClick/disabled behave like the real component.
-    FixedBottomCTA: ({ children, onClick, disabled }: any) =>
-      React.createElement("button", { onClick, disabled }, children),
+    FixedBottomCTA: ({ children, onClick, disabled, ...props }: any) =>
+      React.createElement("button", { onClick, disabled, ...props }, children),
 
     BottomSheet: Object.assign(
       ({ children, open }: any) =>
@@ -302,6 +302,8 @@ export function mockTossRewardAd() {
 
 // ── react-router-dom ──
 // Preserve actual router + override useNavigate for assertion.
+// useLocation delegates to the real hook so it reflects MemoryRouter's
+// initialEntries (pathname/state) instead of a static stand-in.
 export function mockRouter() {
   vi.mock("react-router-dom", async () => {
     const actual = await vi.importActual<typeof import("react-router-dom")>(
@@ -310,7 +312,7 @@ export function mockRouter() {
     return {
       ...actual,
       useNavigate: () => mockNavigate,
-      useLocation: () => mockLocation,
+      useLocation: actual.useLocation,
     };
   });
 }

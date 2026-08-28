@@ -22,9 +22,13 @@ const INPUT: CalcInput = {
 const RESULT = calculate(INPUT);
 const SHARE_STATE: RouteState["/share"] = { input: INPUT, result: RESULT };
 
-function renderShare(state: RouteState["/share"] | undefined = SHARE_STATE) {
+// Rest-tuple param (instead of a default value) so `renderShare(undefined)`
+// is distinguishable from `renderShare()` — a default param can't tell those
+// apart, since both leave the argument as `undefined`.
+function renderShare(...args: [RouteState["/share"] | undefined] | []) {
+  const resolved = args.length === 0 ? SHARE_STATE : args[0];
   return renderWithRouter(React.createElement(Share), {
-    initialEntries: [{ pathname: "/share", state: state ?? null }],
+    initialEntries: [{ pathname: "/share", state: resolved ?? null }],
   });
 }
 

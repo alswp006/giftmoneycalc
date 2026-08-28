@@ -39,6 +39,7 @@ export function SubmitFooter({
         onClick();
       }}
       disabled={disabled}
+      style={{ minHeight: 52 }}
     >
       {label}
     </FixedBottomCTA>
