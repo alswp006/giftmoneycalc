@@ -246,30 +246,27 @@ describe("도메인 타입 · AppErrorCode · RouteState 정의", () => {
     it("should export Result type with ok: false case", () => {
       const errorResult: Result<CalcResult> = {
         ok: false,
-        code: 404,
-        error: "삭제되었거나 없는 기록이에요",
+        error: { code: 404, message: "삭제되었거나 없는 기록이에요" },
       };
       expect(errorResult.ok).toBe(false);
       if (!errorResult.ok) {
-        expect(errorResult.code).toBe(404);
-        expect(errorResult.error).toBe("삭제되었거나 없는 기록이에요");
+        expect(errorResult.error.code).toBe(404);
+        expect(errorResult.error.message).toBe("삭제되었거나 없는 기록이에요");
       }
     });
 
     it("should support multiple error codes", () => {
       const conflicts: Result<void> = {
         ok: false,
-        code: 409,
-        error: "다른 화면에서 이미 수정된 기록이에요. 새로고침 후 다시 시도해주세요",
+        error: { code: 409, message: "다른 화면에서 이미 수정된 기록이에요. 새로고침 후 다시 시도해주세요" },
       };
-      expect(conflicts.code).toBe(409);
+      if (!conflicts.ok) expect(conflicts.error.code).toBe(409);
 
       const storage: Result<void> = {
         ok: false,
-        code: 507,
-        error: "저장 공간이 부족해요. 기록을 삭제하고 다시 시도해주세요",
+        error: { code: 507, message: "저장 공간이 부족해요. 기록을 삭제하고 다시 시도해주세요" },
       };
-      expect(storage.code).toBe(507);
+      if (!storage.ok) expect(storage.error.code).toBe(507);
     });
   });
 

@@ -51,7 +51,7 @@ export type AppErrorCode = 401 | 403 | 404 | 409 | 413 | 416 | 422 | 500 | 507;
 
 export type Result<T> =
   | { ok: true; data: T }
-  | { ok: false; code: AppErrorCode; error: string };
+  | { ok: false; error: { code: AppErrorCode; message: string } };
 
 export interface GiftRecord {
   id: string;

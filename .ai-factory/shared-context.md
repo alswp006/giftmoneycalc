@@ -178,6 +178,7 @@ export interface RouteState {
     errors.test.ts
     errors.ts
     records.ts
+    settings.ts
     storage.ts
     types.ts
     utils.ts
@@ -195,6 +196,7 @@ export interface RouteState {
 - contract.ts: export type AppErrorCode = 'DUPLICATE_RECORD' | 'NOT_FOUND' | 'VALIDATION_ERROR' | 'STORAGE_ERROR' | 'NETWORK_ERROR'; export type DomainRecord =; export type Settings =; export type RouteState = 'home' | 'calc' | 'result' | 'history' | 'history/:id' | 'stats' | 'share' | 'settings'; export type getErrorMessageFn = (code: AppErrorCode) => string; export type subscribeRecordsFn = (callback: (records: DomainRecord[]) => void) => () => void; export type createRecordFn = (data: Omit<DomainRecord, 'id' | 'createdAt' | 'updatedAt'>) => DomainRecord; export type updateRecordFn = (id: string, data: Partial<Omit<DomainRecord, 'id' | 'createdAt' | 'updatedAt'>>) => Domain
 - errors.ts: export const ERROR_MESSAGES: Record<AppErrorCode, string> =; export function getErrorMessage(code: AppErrorCode): string; export function fail(code: AppErrorCode); export function ok<T>(data: T)
 - records.ts: export type CreateRecordInput = Omit< GiftRecord, "id" | "createdAt" | "updatedAt" | "relationship" > &; export type UpdateRecordPatch = Partial< Omit<GiftRecord, "id" | "createdAt" | "updatedAt"> >; export type RecordFilter =; export function createRecord( input: CreateRecordInput, opts?:; export function updateRecord( id: string, patch: UpdateRecordPatch, baseUpdatedAt: number, ): Result<GiftRecord>; export function deleteRecord(id: string): Result<void>; export function queryRecords(filter?: RecordFilter): GiftRecord[]; export function subscribeRecords(cb: Listener): () => void
+- settings.ts: export function getSettings(): AppSettings; export function saveSettings(partial: Partial<AppSettings>): Result<AppSettings>; export function unlockReward(now: number): Result<AppSettings>; export function isRewardUnlocked(now: number): boolean; export function updateSettings(partial: Partial<Settings>): Settings
 - storage.ts: export function readRecords(): GiftRecord[]; export function writeRecords(records: GiftRecord[]): Result<void>; export function readSettings(): AppSettings; export function writeSettings(settings: AppSettings): Result<void>; export function clearAll(): Result<void>
 - types.ts: export type EventType = "wedding" | "funeral" | "firstBirthday" | "etc"; export type Relationship = | "parents" | "siblings" | "spouse" | "children" | "relatives" | "friends" | "colleagues" | "; export type Region = | "seoul" | "gyeonggi" | "incheon" | "busan" | "daegu" | "daejeon" | "gwangju" | "ulsan" | "sejong"; export interface CalcInput; export interface CalcResult; export interface GiftRecord; export interface AppSettings; export interface StatsSummary
 - utils.ts: export function cn(...classes: (string | boolean | undefined | null)[]): string; export function formatNumber(n: number): string; export function formatCurrency(n: number, currency = 'KRW'): string
@@ -218,6 +220,7 @@ export interface RouteState {
 ### Module Dependencies (import graph)
   lib/errors.ts → imports: lib/types
   lib/records.ts → imports: lib/types, lib/errors, lib/storage
+  lib/settings.ts → imports: lib/types, lib/contract, lib/errors, lib/storage
   lib/storage.ts → imports: lib/types, lib/errors
 CRITICAL: Before creating any new function, type, or component, check the list above. If something similar exists, import and use it.
 
@@ -226,6 +229,7 @@ CRITICAL: Before creating any new function, type, or component, check the list a
 - 0002: 오류 문구 단일 소스 errors.ts + 하드코딩 검증 스크립트 (files: src/lib/errors.ts, src/lib/errors.test.ts, scripts/check-error-source.mjs)
 - 0003: localStorage CRUD 기반 모듈 (키 격리 · 413 · 507) (files: src/lib/storage.ts, src/lib/storage.test.ts)
 - 0004: 레코드 도메인 연산 (409 중복·낙관적 잠금 · 404 · subscribeRecords) (files: src/lib/records.ts, src/lib/records.test.ts)
+- 0005: 설정 저장 계층 (확인 후 반영 · 리워드 24시간 해제) (files: src/lib/settings.ts, src/lib/settings.test.ts)
 
 ## Available exports from existing files
 // src/App.tsx
