@@ -36,17 +36,22 @@ export interface CalcInput {
   eventType: EventType;
   relationship: Relationship;
   region: Region;
-  personName: string;
-  baseAmount: number;
+  attend: boolean;
+  inflationAdjust: boolean;
 }
 
 export interface CalcResult {
   recommendedAmount: number;
-  minAmount: number;
-  maxAmount: number;
-  regionAdjustedAmount: number;
-  reason: string;
+  rangeMin: number;
+  rangeMax: number;
+  reasons: string[];
 }
+
+export type AppErrorCode = 401 | 403 | 404 | 409 | 413 | 416 | 422 | 500 | 507;
+
+export type Result<T> =
+  | { ok: true; data: T }
+  | { ok: false; code: AppErrorCode; error: string };
 
 export interface GiftRecord {
   id: string;
@@ -73,17 +78,11 @@ export interface StatsSummary {
   eventTypeCounts: Record<EventType, number>;
 }
 
-export type AppErrorCode = 401 | 403 | 404 | 409 | 413 | 416 | 422 | 500 | 507;
-
-export type Result<T> =
-  | { ok: true; data: T }
-  | { ok: false; error: { code: AppErrorCode; message: string } };
-
-export interface RouteState {
+export type RouteState = {
   "/": undefined;
-  "/calc": CalcInput;
-  "/result": { input: CalcInput; result: CalcResult };
-  "/history": { records: GiftRecord[] };
-  "/share": { input: CalcInput; result: CalcResult };
-  "/settings": Partial<AppSettings>;
-}
+  "/calc": { prefill?: Partial<CalcInput> } | undefined;
+  "/result": { input: CalcInput; result: CalcResult } | undefined;
+  "/history": { prefill: (CalcInput & { recommendedAmount: number }) | null } | undefined;
+  "/share": { input: CalcInput; result: CalcResult } | undefined;
+  "/settings": undefined;
+};

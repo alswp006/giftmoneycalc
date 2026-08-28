@@ -65,27 +65,36 @@ describe("도메인 타입 · AppErrorCode · RouteState 정의", () => {
         eventType: "wedding",
         relationship: "friends",
         region: "seoul",
-        personName: "김철수",
-        baseAmount: 50000,
+        attend: true,
+        inflationAdjust: false,
       };
       expect(input.eventType).toBe("wedding");
       expect(input.relationship).toBe("friends");
       expect(input.region).toBe("seoul");
-      expect(input.personName).toBe("김철수");
-      expect(input.baseAmount).toBe(50000);
-      expect(input.baseAmount).toBeGreaterThanOrEqual(0);
+      expect(input.attend).toBe(true);
+      expect(input.inflationAdjust).toBe(false);
     });
 
-    it("should have baseAmount as number (amount in KRW)", () => {
-      const input: CalcInput = {
+    it("should support all boolean combinations for attend and inflationAdjust", () => {
+      const input1: CalcInput = {
         eventType: "wedding",
         relationship: "spouse",
         region: "gyeonggi",
-        personName: "이영희",
-        baseAmount: 100000,
+        attend: true,
+        inflationAdjust: true,
       };
-      expect(typeof input.baseAmount).toBe("number");
-      expect(input.baseAmount).toBeGreaterThan(0);
+      expect(input1.attend).toBe(true);
+      expect(input1.inflationAdjust).toBe(true);
+
+      const input2: CalcInput = {
+        eventType: "funeral",
+        relationship: "parents",
+        region: "busan",
+        attend: false,
+        inflationAdjust: false,
+      };
+      expect(input2.attend).toBe(false);
+      expect(input2.inflationAdjust).toBe(false);
     });
   });
 
@@ -93,65 +102,84 @@ describe("도메인 타입 · AppErrorCode · RouteState 정의", () => {
     it("should export CalcResult with calculated values", () => {
       const result: CalcResult = {
         recommendedAmount: 50000,
-        minAmount: 30000,
-        maxAmount: 100000,
-        regionAdjustedAmount: 55000,
-        reason: "평균 선물액에 지역별 조정 반영",
+        rangeMin: 30000,
+        rangeMax: 100000,
+        reasons: ["기본 관례 기준", "지역별 조정 반영"],
       };
       expect(result.recommendedAmount).toBe(50000);
-      expect(result.minAmount).toBe(30000);
-      expect(result.maxAmount).toBe(100000);
-      expect(result.regionAdjustedAmount).toBe(55000);
-      expect(result.reason).toBeTruthy();
-      expect(result.minAmount).toBeLessThanOrEqual(result.recommendedAmount);
-      expect(result.recommendedAmount).toBeLessThanOrEqual(result.maxAmount);
+      expect(result.rangeMin).toBe(30000);
+      expect(result.rangeMax).toBe(100000);
+      expect(result.reasons).toHaveLength(2);
+      expect(result.reasons[0]).toBe("기본 관례 기준");
+      expect(result.reasons[1]).toBe("지역별 조정 반영");
+    });
+
+    it("should have reasons as string array with multiple entries", () => {
+      const result: CalcResult = {
+        recommendedAmount: 100000,
+        rangeMin: 50000,
+        rangeMax: 150000,
+        reasons: ["결혼식 기준", "서울 지역 조정", "물가 인상 반영"],
+      };
+      expect(Array.isArray(result.reasons)).toBe(true);
+      expect(result.reasons.length).toBeGreaterThanOrEqual(2);
+      result.reasons.forEach((reason) => {
+        expect(typeof reason).toBe("string");
+        expect(reason.length).toBeGreaterThan(0);
+      });
     });
   });
 
-  describe("AC-1: GiftRecord 정의 (DB Schema)", () => {
-    it("should export GiftRecord with all required fields", () => {
-      const now = Date.now();
+  describe("AC-1: GiftRecord 정의", () => {
+    it("should export GiftRecord type for stored records", () => {
       const record: GiftRecord = {
-        id: "rec_" + now,
-        personName: "박영수",
+        id: "record-123",
+        personName: "김철수",
         eventType: "wedding",
         relationship: "friends",
-        eventDate: "2026-08-29",
+        eventDate: "2024-06-15",
         amount: 50000,
-        memo: "좋은 친구의 결혼식",
-        createdAt: now,
-        updatedAt: now,
+        memo: "축의금",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
       };
-      expect(record.id).toBeTruthy();
-      expect(record.personName).toBe("박영수");
+      expect(record.id).toBe("record-123");
+      expect(record.personName).toBe("김철수");
       expect(record.eventType).toBe("wedding");
-      expect(record.relationship).toBe("friends");
-      expect(record.eventDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      expect(record.eventDate).toBe("2024-06-15");
       expect(record.amount).toBe(50000);
-      expect(record.memo).toBe("좋은 친구의 결혼식");
-      expect(record.createdAt).toBeGreaterThan(0);
-      expect(record.updatedAt).toBeGreaterThanOrEqual(record.createdAt);
     });
 
-    it("should allow optional memo field", () => {
-      const now = Date.now();
+    it("should support optional memo field", () => {
+      const recordWithMemo: GiftRecord = {
+        id: "r1",
+        personName: "이영희",
+        eventType: "funeral",
+        relationship: "siblings",
+        eventDate: "2024-05-20",
+        amount: 30000,
+        memo: "부의금",
+        createdAt: 1000,
+        updatedAt: 1000,
+      };
+      expect(recordWithMemo.memo).toBe("부의금");
+
       const recordWithoutMemo: GiftRecord = {
-        id: "rec_" + now,
-        personName: "최민지",
+        id: "r2",
+        personName: "박민수",
         eventType: "firstBirthday",
-        relationship: "children",
-        eventDate: "2026-01-15",
+        relationship: "relatives",
+        eventDate: "2024-01-10",
         amount: 100000,
-        createdAt: now,
-        updatedAt: now,
+        createdAt: 2000,
+        updatedAt: 2000,
       };
       expect(recordWithoutMemo.memo).toBeUndefined();
-      expect(recordWithoutMemo.personName).toBe("최민지");
     });
   });
 
-  describe("AC-1: AppSettings 정의 (DB Schema)", () => {
-    it("should export AppSettings with configuration fields", () => {
+  describe("AC-1: AppSettings 정의", () => {
+    it("should export AppSettings with configuration", () => {
       const settings: AppSettings = {
         defaultRegion: "seoul",
         inflationAdjustDefault: true,
@@ -162,215 +190,259 @@ describe("도메인 타입 · AppErrorCode · RouteState 정의", () => {
       expect(settings.rewardUnlockedUntil).toBeNull();
     });
 
-    it("should allow rewardUnlockedUntil as timestamp or null", () => {
-      const now = Date.now();
-      const settingsWithReward: AppSettings = {
+    it("should support rewardUnlockedUntil as timestamp or null", () => {
+      const settingsLocked: AppSettings = {
         defaultRegion: "gyeonggi",
         inflationAdjustDefault: false,
-        rewardUnlockedUntil: now,
+        rewardUnlockedUntil: null,
       };
-      expect(settingsWithReward.rewardUnlockedUntil).toBeGreaterThan(0);
-      expect(typeof settingsWithReward.rewardUnlockedUntil).toBe("number");
-    });
-  });
+      expect(settingsLocked.rewardUnlockedUntil).toBeNull();
 
-  describe("AC-1: StatsSummary 정의", () => {
-    it("should export StatsSummary with aggregate statistics", () => {
-      const stats: StatsSummary = {
-        totalRecords: 5,
-        totalAmount: 250000,
-        averageAmount: 50000,
-        eventTypeCounts: {
-          wedding: 2,
-          funeral: 1,
-          firstBirthday: 1,
-          etc: 1,
-        },
+      const now = Date.now();
+      const settingsUnlocked: AppSettings = {
+        defaultRegion: "busan",
+        inflationAdjustDefault: true,
+        rewardUnlockedUntil: now + 86400000,
       };
-      expect(stats.totalRecords).toBe(5);
-      expect(stats.totalAmount).toBe(250000);
-      expect(stats.averageAmount).toBe(50000);
-      expect(stats.eventTypeCounts.wedding).toBe(2);
-      expect(stats.eventTypeCounts.funeral).toBe(1);
-      expect(stats.totalAmount / stats.totalRecords).toBe(stats.averageAmount);
+      expect(settingsUnlocked.rewardUnlockedUntil).toBeGreaterThan(now);
     });
   });
 
   describe("AC-1: AppErrorCode 정의", () => {
-    it("should export AppErrorCode with all HTTP-like error codes", () => {
+    it("should export AppErrorCode with all error variants", () => {
       const errorCodes: AppErrorCode[] = [
         401, 403, 404, 409, 413, 416, 422, 500, 507,
       ];
       expect(errorCodes).toHaveLength(9);
-      expect(errorCodes).toContain(401); // Unauthorized
-      expect(errorCodes).toContain(403); // Forbidden
-      expect(errorCodes).toContain(404); // Not Found
-      expect(errorCodes).toContain(409); // Conflict
-      expect(errorCodes).toContain(413); // Payload Too Large
-      expect(errorCodes).toContain(416); // Range Not Satisfiable
-      expect(errorCodes).toContain(422); // Unprocessable Entity
-      expect(errorCodes).toContain(500); // Internal Server Error
-      expect(errorCodes).toContain(507); // Insufficient Storage
+      expect(errorCodes).toContain(401); // Unauthorized (toss app)
+      expect(errorCodes).toContain(403); // Forbidden (permission)
+      expect(errorCodes).toContain(404); // Not found
+      expect(errorCodes).toContain(409); // Conflict (duplicate/lock)
+      expect(errorCodes).toContain(413); // Payload too large
+      expect(errorCodes).toContain(416); // Range not satisfiable (end of list)
+      expect(errorCodes).toContain(422); // Unprocessable entity (invalid data)
+      expect(errorCodes).toContain(500); // Internal server error
+      expect(errorCodes).toContain(507); // Insufficient storage
     });
   });
 
-  describe("AC-1: Result<T> generic type 정의", () => {
-    it("should export Result generic for success case", () => {
+  describe("AC-1: Result<T> 정의", () => {
+    it("should export Result type with ok: true case", () => {
       const successResult: Result<CalcResult> = {
         ok: true,
         data: {
           recommendedAmount: 50000,
-          minAmount: 30000,
-          maxAmount: 100000,
-          regionAdjustedAmount: 55000,
-          reason: "평균 기준",
+          rangeMin: 30000,
+          rangeMax: 100000,
+          reasons: ["기준 금액", "지역 조정"],
         },
       };
       expect(successResult.ok).toBe(true);
-      expect(successResult.data).toBeTruthy();
-      expect(successResult.data.recommendedAmount).toBe(50000);
+      if (successResult.ok) {
+        expect(successResult.data.recommendedAmount).toBe(50000);
+      }
     });
 
-    it("should export Result generic for error case", () => {
-      const errorResult: Result<null> = {
+    it("should export Result type with ok: false case", () => {
+      const errorResult: Result<CalcResult> = {
         ok: false,
-        error: {
-          code: 422,
-          message: "유효하지 않은 입력값입니다",
-        },
+        code: 404,
+        error: "삭제되었거나 없는 기록이에요",
       };
       expect(errorResult.ok).toBe(false);
-      expect(errorResult.error).toBeTruthy();
-      expect(errorResult.error.code).toBe(422);
-      expect(errorResult.error.message).toBeTruthy();
+      if (!errorResult.ok) {
+        expect(errorResult.code).toBe(404);
+        expect(errorResult.error).toBe("삭제되었거나 없는 기록이에요");
+      }
+    });
+
+    it("should support multiple error codes", () => {
+      const conflicts: Result<void> = {
+        ok: false,
+        code: 409,
+        error: "다른 화면에서 이미 수정된 기록이에요. 새로고침 후 다시 시도해주세요",
+      };
+      expect(conflicts.code).toBe(409);
+
+      const storage: Result<void> = {
+        ok: false,
+        code: 507,
+        error: "저장 공간이 부족해요. 기록을 삭제하고 다시 시도해주세요",
+      };
+      expect(storage.code).toBe(507);
     });
   });
 
-  describe("AC-2: RouteState 정의 (모든 6개 라우트 포함)", () => {
-    it("should include RouteState for '/' (home)", () => {
+  describe("AC-1: RouteState 정의", () => {
+    it("should define RouteState for home route", () => {
       const homeState: RouteState["/"] = undefined;
       expect(homeState).toBeUndefined();
     });
 
-    it("should include RouteState for '/calc' (input)", () => {
-      const calcState: RouteState["/calc"] = {
-        personName: "김철수",
-        eventType: "wedding",
-        relationship: "friends",
-        region: "seoul",
-        baseAmount: 50000,
+    it("should define RouteState for calc route with optional prefill", () => {
+      const calcState1: RouteState["/calc"] = undefined;
+      expect(calcState1).toBeUndefined();
+
+      const calcState2: RouteState["/calc"] = {
+        prefill: {
+          eventType: "wedding",
+          region: "seoul",
+        },
       };
-      expect(calcState.personName).toBe("김철수");
-      expect(calcState.eventType).toBe("wedding");
-      expect(calcState.baseAmount).toBe(50000);
+      expect(calcState2?.prefill?.eventType).toBe("wedding");
     });
 
-    it("should include RouteState for '/result' (calculated)", () => {
+    it("should define RouteState for result route with input", () => {
       const resultState: RouteState["/result"] = {
         input: {
-          eventType: "funeral",
-          relationship: "parents",
-          region: "incheon",
-          personName: "이순신",
-          baseAmount: 300000,
-        },
-        result: {
-          recommendedAmount: 300000,
-          minAmount: 200000,
-          maxAmount: 500000,
-          regionAdjustedAmount: 300000,
-          reason: "장례식 평균 선물액",
-        },
-      };
-      expect(resultState.input.eventType).toBe("funeral");
-      expect(resultState.result.recommendedAmount).toBe(300000);
-      expect(resultState.result.minAmount).toBeLessThanOrEqual(
-        resultState.result.recommendedAmount
-      );
-    });
-
-    it("should include RouteState for '/history' (records)", () => {
-      const now = Date.now();
-      const historyState: RouteState["/history"] = {
-        records: [
-          {
-            id: "rec_1",
-            personName: "박영수",
-            eventType: "wedding",
-            relationship: "friends",
-            eventDate: "2026-08-20",
-            amount: 50000,
-            createdAt: now,
-            updatedAt: now,
-          },
-        ],
-      };
-      expect(historyState.records).toHaveLength(1);
-      expect(historyState.records[0].personName).toBe("박영수");
-      expect(historyState.records[0].eventType).toBe("wedding");
-    });
-
-    it("should include RouteState for '/share' with input and result", () => {
-      const shareState: RouteState["/share"] = {
-        input: {
           eventType: "wedding",
-          relationship: "spouse",
+          relationship: "parents",
           region: "seoul",
-          personName: "최민지",
-          baseAmount: 100000,
+          attend: true,
+          inflationAdjust: false,
         },
         result: {
           recommendedAmount: 100000,
-          minAmount: 80000,
-          maxAmount: 150000,
-          regionAdjustedAmount: 110000,
-          reason: "신혼부부 선물액",
+          rangeMin: 50000,
+          rangeMax: 150000,
+          reasons: ["기본 기준", "지역 조정"],
         },
       };
-      expect(shareState.input.personName).toBe("최민지");
-      expect(shareState.result.recommendedAmount).toBe(100000);
-      expect(shareState.input).toBeTruthy();
-      expect(shareState.result).toBeTruthy();
+      expect(resultState?.input?.eventType).toBe("wedding");
+      expect(resultState?.result?.recommendedAmount).toBe(100000);
     });
 
-    it("should include RouteState for '/settings' (configuration)", () => {
-      const settingsState: RouteState["/settings"] = {
-        defaultRegion: "gyeonggi",
-        inflationAdjustDefault: true,
+    it("should define RouteState for history route with prefill", () => {
+      const historyState: RouteState["/history"] = {
+        prefill: {
+          eventType: "wedding",
+          relationship: "parents",
+          region: "seoul",
+          attend: true,
+          inflationAdjust: false,
+          recommendedAmount: 100000,
+        },
       };
-      expect(settingsState.defaultRegion).toBe("gyeonggi");
-      expect(settingsState.inflationAdjustDefault).toBe(true);
+      expect(historyState?.prefill?.eventType).toBe("wedding");
+      expect(historyState?.prefill?.recommendedAmount).toBe(100000);
     });
 
-    it("should have RouteState keys matching all 6 routes", () => {
-      const routeKeys = ["/", "/calc", "/result", "/history", "/share", "/settings"] as const;
-      routeKeys.forEach((key) => {
-        // RouteState should have a definition for each key
-        // This test ensures the type has all required keys
-        const stateRecord: Record<typeof key, any> = {} as any;
-        expect(key).toBeTruthy();
+    it("should define RouteState for share route with input and result", () => {
+      const shareState: RouteState["/share"] = {
+        input: {
+          eventType: "funeral",
+          relationship: "parents",
+          region: "busan",
+          attend: true,
+          inflationAdjust: true,
+        },
+        result: {
+          recommendedAmount: 50000,
+          rangeMin: 30000,
+          rangeMax: 100000,
+          reasons: ["장례식 기준", "부산 지역"],
+        },
+      };
+      expect(shareState?.input?.eventType).toBe("funeral");
+      expect(shareState?.result?.recommendedAmount).toBe(50000);
+    });
+
+    it("should define RouteState for settings route", () => {
+      const settingsState: RouteState["/settings"] = undefined;
+      expect(settingsState).toBeUndefined();
+    });
+  });
+
+  describe("AC-1: Type compatibility", () => {
+    it("should allow all EventType values in CalcInput", () => {
+      const events: EventType[] = [
+        "wedding",
+        "funeral",
+        "firstBirthday",
+        "etc",
+      ];
+
+      events.forEach((event) => {
+        const input: CalcInput = {
+          eventType: event,
+          relationship: "friends",
+          region: "seoul",
+          attend: true,
+          inflationAdjust: false,
+        };
+        expect(input.eventType).toBe(event);
+      });
+    });
+
+    it("should allow all Relationship values in CalcInput", () => {
+      const relationships: Relationship[] = [
+        "parents",
+        "siblings",
+        "spouse",
+        "children",
+        "relatives",
+        "friends",
+        "colleagues",
+        "boss",
+        "acquaintance",
+      ];
+
+      relationships.forEach((rel) => {
+        const input: CalcInput = {
+          eventType: "wedding",
+          relationship: rel,
+          region: "seoul",
+          attend: true,
+          inflationAdjust: false,
+        };
+        expect(input.relationship).toBe(rel);
+      });
+    });
+
+    it("should allow all Region values in CalcInput", () => {
+      const regions: Region[] = [
+        "seoul",
+        "gyeonggi",
+        "incheon",
+        "busan",
+        "daegu",
+        "daejeon",
+        "gwangju",
+        "ulsan",
+        "sejong",
+        "gangwon",
+        "chungbuk",
+        "chungnam",
+        "jeonbuk",
+        "jeonnam",
+        "gyeongbuk",
+        "gyeongnam",
+        "jeju",
+      ];
+
+      regions.forEach((region) => {
+        const input: CalcInput = {
+          eventType: "wedding",
+          relationship: "friends",
+          region,
+          attend: true,
+          inflationAdjust: false,
+        };
+        expect(input.region).toBe(region);
       });
     });
   });
 
-  describe("AC-3: TypeScript compilation check", () => {
-    it("should have valid TypeScript types", () => {
-      // This test passes if the imports above succeed without type errors
-      // In real TDD, `npx tsc --noEmit` will catch any type issues
-      // This is a runtime confirmation that types are importable
-      expect(true).toBe(true);
-    });
-  });
+  describe("AC-1: Types are exported correctly", () => {
+    it("should have all required types available", () => {
+      // This test just ensures all types can be imported and used
+      const eventType: EventType = "wedding";
+      const relationship: Relationship = "parents";
+      const region: Region = "seoul";
 
-  describe("AC-4: No runtime code in types.ts", () => {
-    it("should only contain type definitions (no const/function/let/var/class)", () => {
-      // This test is more of a documentation test
-      // The actual validation happens with: grep -cE '^(export )?(const|function|let|var|class) ' src/lib/types.ts
-      // Should return 0
-
-      // For runtime confirmation, we verify that we can import types but not value-level exports
-      // that would indicate runtime code
-      expect(true).toBe(true); // Placeholder for validation during CI
+      expect(eventType).toBeDefined();
+      expect(relationship).toBeDefined();
+      expect(region).toBeDefined();
     });
   });
 });
