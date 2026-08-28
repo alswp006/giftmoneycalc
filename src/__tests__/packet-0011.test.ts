@@ -48,7 +48,7 @@ describe("결과 상세 리워드 게이트 (TossRewardAd · 24시간 해제)", 
       return () => {};
     });
     vi.mocked(showFullScreenAd).mockImplementation((params) => {
-      setTimeout(() => params.onEvent({ type: "rewarded" } as Parameters<typeof params.onEvent>[0]), 0);
+      setTimeout(() => params.onEvent({ type: "rewarded" } as unknown as Parameters<typeof params.onEvent>[0]), 0);
       return () => {};
     });
   });

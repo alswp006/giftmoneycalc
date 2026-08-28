@@ -136,10 +136,19 @@ export interface AppSettings {
 }
 
 export interface StatsSummary {
-  totalRecords: number;
   totalAmount: number;
-  averageAmount: number;
-  eventTypeCounts: Record<EventType, number>;
+  count: number;
+  avgAmount: number;
+  byEventType: Array<{
+    type: EventType;
+    amount: number;
+    ratio: number;
+  }>;
+  monthlyTrend: Array<{
+    month: string; // YYYY-MM format
+    amount: number;
+  }>;
+  topRelationship: Relationship | null;
 }
 
 export type RouteState = {
@@ -172,6 +181,8 @@ export type RouteState = {
     TossPurchase.tsx
     TossRewardAd.tsx
   hooks/
+    useRecords.ts
+    useSettings.ts
   lib/
     calc.test.ts
     calc.ts
@@ -181,6 +192,7 @@ export type RouteState = {
     records.ts
     rules.ts
     settings.ts
+    stats.ts
     storage.ts
     types.ts
     utils.ts
@@ -201,6 +213,7 @@ export type RouteState = {
 - records.ts: export type CreateRecordInput = Omit< GiftRecord, "id" | "createdAt" | "updatedAt" | "relationship" > &; export type UpdateRecordPatch = Partial< Omit<GiftRecord, "id" | "createdAt" | "updatedAt"> >; export type RecordFilter =; export function createRecord( input: CreateRecordInput, opts?:; export function updateRecord( id: string, patch: UpdateRecordPatch, baseUpdatedAt: number, ): Result<GiftRecord>; export function deleteRecord(id: string): Result<void>; export function queryRecords(filter?: RecordFilter): GiftRecord[]; export function subscribeRecords(cb: Listener): () => void
 - rules.ts: export const ROUND_UNIT = 10000; export const BASE_AMOUNT_TABLE: Record<EventType, Record<Relationship, number>> =; export const ATTEND_MULTIPLIER = 1.0; export const ABSENT_MULTIPLIER = 0.8; export const REGION_MULTIPLIER: Record<Region, number> =; export const INFLATION_MULTIPLIER = 1.05; export const NO_INFLATION_MULTIPLIER = 1.0; export const RANGE_MIN_RATIO = 0.8
 - settings.ts: export function getSettings(): AppSettings; export function saveSettings(partial: Partial<AppSettings>): Result<AppSettings>; export function unlockReward(now: number): Result<AppSettings>; export function isRewardUnlocked(now: number): boolean; export function updateSettings(partial: Partial<Settings>): Settings
+- stats.ts: export function aggregate(records: GiftRecord[], _now: number): StatsSummary
 - storage.ts: export function readRecords(): GiftRecord[]; export function writeRecords(records: GiftRecord[]): Result<void>; export function readSettings(): AppSettings; export function writeSettings(settings: AppSettings): Result<void>; export function clearAll(): Result<void>
 - types.ts: export type EventType = "wedding" | "funeral" | "firstBirthday" | "etc"; export type Relationship = | "parents" | "siblings" | "spouse" | "children" | "relatives" | "friends" | "colleagues" | "; export type Region = | "seoul" | "gyeonggi" | "incheon" | "busan" | "daegu" | "daejeon" | "gwangju" | "ulsan" | "sejong"; export interface CalcInput; export interface CalcResult; export type AppErrorCode = 401 | 403 | 404 | 409 | 413 | 416 | 422 | 500 | 507; export type Result<T> = |; export interface GiftRecord
 - utils.ts: export function cn(...classes: (string | boolean | undefined | null)[]): string; export function formatNumber(n: number): string; export function formatCurrency(n: number, currency = 'KRW'): string
@@ -227,6 +240,7 @@ export type RouteState = {
   lib/records.ts → imports: lib/types, lib/errors, lib/storage
   lib/rules.ts → imports: lib/types
   lib/settings.ts → imports: lib/types, lib/contract, lib/errors, lib/storage
+  lib/stats.ts → imports: lib/types
   lib/storage.ts → imports: lib/types, lib/errors
 CRITICAL: Before creating any new function, type, or component, check the list above. If something similar exists, import and use it.
 
@@ -237,6 +251,7 @@ CRITICAL: Before creating any new function, type, or component, check the list a
 - 0004: 레코드 도메인 연산 (409 중복·낙관적 잠금 · 404 · subscribeRecords) (files: src/lib/records.ts, src/lib/records.test.ts)
 - 0005: 설정 저장 계층 (확인 후 반영 · 리워드 24시간 해제) (files: src/lib/settings.ts, src/lib/settings.test.ts)
 - 0006: 계산 엔진 (rules.ts 상수 격리 + calc.ts 결정론 함수) (files: src/lib/rules.ts, src/lib/calc.ts, src/lib/calc.test.ts)
+- 0007: 통계 집계 함수 + 상태 관리 훅 (useRecords · useSettings) (files: src/lib/stats.ts, src/lib/stats.test.ts, src/hooks/useRecords.ts, src/hooks/useSettings.ts)
 
 ## Available exports from existing files
 // src/App.tsx
@@ -288,6 +303,12 @@ export function TossPurchase({
 // src/components/TossRewardAd.tsx
 export function TossRewardAd({
 
+// src/hooks/useRecords.ts
+export function useRecords(): {
+
+// src/hooks/useSettings.ts
+export function useSettings(): {
+
 // src/lib/calc.ts
 export function calculate(input: CalcInput): CalcResult {
 
@@ -297,8 +318,7 @@ export type DomainRecord = { id: string; date: string; amountKrw: number; catego
 export type Settings = { rewardUnlockTime?: number; currency?: string; categoryFilters?: string[] };
 export type RouteState = 'home' | 'calc' | 'result' | 'history' | 'history/:id' | 'stats' | 'share' | 'settings';
 export type getErrorMessageFn = (code: AppErrorCode) => string;
-export type subscribeRecordsFn = (callback: (records: DomainRecord[]) => void) => () => void;
-export type createRecordFn = (data: Omit<DomainRecord, 'id' | 'creat
+export type subscribeRecordsFn = (callba
 
 ## Memory Index (자동 학습 — 힌트로만 사용, 실제 코드 확인 필수)
 
