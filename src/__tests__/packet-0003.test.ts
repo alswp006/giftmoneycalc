@@ -280,8 +280,8 @@ describe("localStorage CRUD 기반 모듈 (키 격리 · 413 · 507)", () => {
 
       const result = writeRecords(records);
       expect(result.ok).toBe(false);
-      expect((result as Result<void>).error.code).toBe(413);
-      expect((result as Result<void>).error.message).toBeTruthy();
+      expect((result as Extract<Result<void>, { ok: false }>).error.code).toBe(413);
+      expect((result as Extract<Result<void>, { ok: false }>).error.message).toBeTruthy();
     });
 
     it("should not modify existing records when 413 error occurs", () => {
@@ -321,7 +321,7 @@ describe("localStorage CRUD 기반 모듈 (키 격리 · 413 · 507)", () => {
 
       const writeResult2 = writeRecords(tooManyRecords);
       expect(writeResult2.ok).toBe(false);
-      expect((writeResult2 as Result<void>).error.code).toBe(413);
+      expect((writeResult2 as Extract<Result<void>, { ok: false }>).error.code).toBe(413);
 
       // Verify original 500 records are still there unchanged
       const readResult2 = readRecords();
@@ -362,7 +362,7 @@ describe("localStorage CRUD 기반 모듈 (키 격리 · 413 · 507)", () => {
 
       const result = writeRecords(records2);
       expect(result.ok).toBe(false);
-      expect((result as Result<void>).error.code).toBe(413);
+      expect((result as Extract<Result<void>, { ok: false }>).error.code).toBe(413);
 
       // Original 800 should remain
       const read2 = readRecords();
@@ -385,8 +385,7 @@ describe("localStorage CRUD 기반 모듈 (키 격리 · 413 · 507)", () => {
       };
 
       // Mock localStorage.setItem to throw QuotaExceededError
-      const originalSetItem = localStorage.setItem;
-      localStorage.setItem = vi.fn(() => {
+      const setItemSpy = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
         const error = new Error("QuotaExceededError");
         error.name = "QuotaExceededError";
         throw error;
@@ -394,10 +393,10 @@ describe("localStorage CRUD 기반 모듈 (키 격리 · 413 · 507)", () => {
 
       const result = writeRecords([record]);
       expect(result.ok).toBe(false);
-      expect((result as Result<void>).error.code).toBe(507);
+      expect((result as Extract<Result<void>, { ok: false }>).error.code).toBe(507);
 
       // Restore original setItem
-      localStorage.setItem = originalSetItem;
+      setItemSpy.mockRestore();
     });
 
     it("should not modify existing records when QuotaExceededError occurs", () => {
@@ -424,8 +423,7 @@ describe("localStorage CRUD 기반 모듈 (키 격리 · 413 · 507)", () => {
       expect(readResult1[0].personName).toBe("초기데이터");
 
       // Mock localStorage.setItem to throw QuotaExceededError
-      const originalSetItem = localStorage.setItem;
-      localStorage.setItem = vi.fn(() => {
+      const setItemSpy = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
         const error = new Error("QuotaExceededError");
         error.name = "QuotaExceededError";
         throw error;
@@ -447,10 +445,10 @@ describe("localStorage CRUD 기반 모듈 (키 격리 · 413 · 507)", () => {
 
       const writeResult2 = writeRecords(newRecords);
       expect(writeResult2.ok).toBe(false);
-      expect((writeResult2 as Result<void>).error.code).toBe(507);
+      expect((writeResult2 as Extract<Result<void>, { ok: false }>).error.code).toBe(507);
 
       // Restore original setItem
-      localStorage.setItem = originalSetItem;
+      setItemSpy.mockRestore();
 
       // Verify original data is unchanged
       const readResult2 = readRecords();
@@ -460,8 +458,7 @@ describe("localStorage CRUD 기반 모듈 (키 격리 · 413 · 507)", () => {
     });
 
     it("should return 507 error when settings write exceeds quota", () => {
-      const originalSetItem = localStorage.setItem;
-      localStorage.setItem = vi.fn(() => {
+      const setItemSpy = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
         const error = new Error("QuotaExceededError");
         error.name = "QuotaExceededError";
         throw error;
@@ -475,9 +472,9 @@ describe("localStorage CRUD 기반 모듈 (키 격리 · 413 · 507)", () => {
 
       const result = writeSettings(settings);
       expect(result.ok).toBe(false);
-      expect((result as Result<void>).error.code).toBe(507);
+      expect((result as Extract<Result<void>, { ok: false }>).error.code).toBe(507);
 
-      localStorage.setItem = originalSetItem;
+      setItemSpy.mockRestore();
     });
   });
 
