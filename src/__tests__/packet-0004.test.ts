@@ -5,6 +5,7 @@ import {
   updateRecord,
   deleteRecord,
   subscribeRecords,
+  queryRecords,
 } from "@/lib/records";
 import { readRecords, writeRecords } from "@/lib/storage";
 
@@ -492,6 +493,92 @@ describe("레코드 도메인 연산 (409 중복·낙관적 잠금 · 404 · sub
       expect(callback2).toHaveBeenCalledTimes(2);
 
       unsubscribe2();
+    });
+  });
+
+  // ─ AC-6: queryRecords - 필터 조회 ─
+  describe("AC-6: queryRecords - 필터 조회", () => {
+    it("should return all records sorted by eventDate desc when no filter given", () => {
+      createRecord({
+        personName: "김철수",
+        eventType: "wedding",
+        eventDate: "2026-08-01",
+        amount: 50000,
+      });
+      createRecord({
+        personName: "이영희",
+        eventType: "funeral",
+        eventDate: "2026-08-20",
+        amount: 100000,
+      });
+
+      const result = queryRecords();
+
+      expect(result.length).toBe(2);
+      expect(result[0].personName).toBe("이영희");
+      expect(result[1].personName).toBe("김철수");
+    });
+
+    it("should filter by eventType", () => {
+      createRecord({
+        personName: "김철수",
+        eventType: "wedding",
+        eventDate: "2026-08-01",
+        amount: 50000,
+      });
+      createRecord({
+        personName: "이영희",
+        eventType: "funeral",
+        eventDate: "2026-08-20",
+        amount: 100000,
+      });
+
+      const result = queryRecords({ eventType: "wedding" });
+
+      expect(result.length).toBe(1);
+      expect(result[0].personName).toBe("김철수");
+    });
+
+    it("should filter by startDate/endDate range", () => {
+      createRecord({
+        personName: "김철수",
+        eventType: "wedding",
+        eventDate: "2026-08-01",
+        amount: 50000,
+      });
+      createRecord({
+        personName: "이영희",
+        eventType: "funeral",
+        eventDate: "2026-08-20",
+        amount: 100000,
+      });
+      createRecord({
+        personName: "박민수",
+        eventType: "etc",
+        eventDate: "2026-09-05",
+        amount: 30000,
+      });
+
+      const result = queryRecords({
+        startDate: "2026-08-10",
+        endDate: "2026-08-31",
+      });
+
+      expect(result.length).toBe(1);
+      expect(result[0].personName).toBe("이영희");
+    });
+
+    it("should return empty array when no records match filter", () => {
+      createRecord({
+        personName: "김철수",
+        eventType: "wedding",
+        eventDate: "2026-08-01",
+        amount: 50000,
+      });
+
+      const result = queryRecords({ eventType: "funeral" });
+
+      expect(result).toEqual([]);
     });
   });
 });

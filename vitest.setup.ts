@@ -33,5 +33,6 @@ if (typeof globalThis.requestAnimationFrame !== "function") {
 // ── afterEach reset ──
 afterEach(() => {
   vi.clearAllMocks();
+  vi.unstubAllGlobals(); // undo vi.stubGlobal() (e.g. crypto.randomUUID stubs) between tests
   vi.useRealTimers(); // in case a test used fake timers
 });
