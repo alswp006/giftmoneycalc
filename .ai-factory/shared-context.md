@@ -100,17 +100,22 @@ export interface CalcInput {
   eventType: EventType;
   relationship: Relationship;
   region: Region;
-  personName: string;
-  baseAmount: number;
+  attend: boolean;
+  inflationAdjust: boolean;
 }
 
 export interface CalcResult {
   recommendedAmount: number;
-  minAmount: number;
-  maxAmount: number;
-  regionAdjustedAmount: number;
-  reason: string;
+  rangeMin: number;
+  rangeMax: number;
+  reasons: string[];
 }
+
+export type AppErrorCode = 401 | 403 | 404 | 409 | 413 | 416 | 422 | 500 | 507;
+
+export type Result<T> =
+  | { ok: true; data: T }
+  | { ok: false; error: { code: AppErrorCode; message: string } };
 
 export interface GiftRecord {
   id: string;
@@ -137,20 +142,14 @@ export interface StatsSummary {
   eventTypeCounts: Record<EventType, number>;
 }
 
-export type AppErrorCode = 401 | 403 | 404 | 409 | 413 | 416 | 422 | 500 | 507;
-
-export type Result<T> =
-  | { ok: true; data: T }
-  | { ok: false; error: { code: AppErrorCode; message: string } };
-
-export interface RouteState {
+export type RouteState = {
   "/": undefined;
-  "/calc": CalcInput;
-  "/result": { input: CalcInput; result: CalcResult };
-  "/history": { records: GiftRecord[] };
-  "/share": { input: CalcInput; result: CalcResult };
-  "/settings": Partial<AppSettings>;
-}
+  "/calc": { prefill?: Partial<CalcInput> } | undefined;
+  "/result": { input: CalcInput; result: CalcResult } | undefined;
+  "/history": { prefill: (CalcInput & { recommendedAmount: number }) | null } | undefined;
+  "/share": { input: CalcInput; result: CalcResult } | undefined;
+  "/settings": undefined;
+};
 
 ```
 
@@ -174,10 +173,13 @@ export interface RouteState {
     TossRewardAd.tsx
   hooks/
   lib/
+    calc.test.ts
+    calc.ts
     contract.ts
     errors.test.ts
     errors.ts
     records.ts
+    rules.ts
     settings.ts
     storage.ts
     types.ts
@@ -193,12 +195,14 @@ export interface RouteState {
   vite-env.d.ts
 
 ### Exports (src/lib/)
+- calc.ts: export function calculate(input: CalcInput): CalcResult
 - contract.ts: export type AppErrorCode = 'DUPLICATE_RECORD' | 'NOT_FOUND' | 'VALIDATION_ERROR' | 'STORAGE_ERROR' | 'NETWORK_ERROR'; export type DomainRecord =; export type Settings =; export type RouteState = 'home' | 'calc' | 'result' | 'history' | 'history/:id' | 'stats' | 'share' | 'settings'; export type getErrorMessageFn = (code: AppErrorCode) => string; export type subscribeRecordsFn = (callback: (records: DomainRecord[]) => void) => () => void; export type createRecordFn = (data: Omit<DomainRecord, 'id' | 'createdAt' | 'updatedAt'>) => DomainRecord; export type updateRecordFn = (id: string, data: Partial<Omit<DomainRecord, 'id' | 'createdAt' | 'updatedAt'>>) => Domain
 - errors.ts: export const ERROR_MESSAGES: Record<AppErrorCode, string> =; export function getErrorMessage(code: AppErrorCode): string; export function fail(code: AppErrorCode); export function ok<T>(data: T)
 - records.ts: export type CreateRecordInput = Omit< GiftRecord, "id" | "createdAt" | "updatedAt" | "relationship" > &; export type UpdateRecordPatch = Partial< Omit<GiftRecord, "id" | "createdAt" | "updatedAt"> >; export type RecordFilter =; export function createRecord( input: CreateRecordInput, opts?:; export function updateRecord( id: string, patch: UpdateRecordPatch, baseUpdatedAt: number, ): Result<GiftRecord>; export function deleteRecord(id: string): Result<void>; export function queryRecords(filter?: RecordFilter): GiftRecord[]; export function subscribeRecords(cb: Listener): () => void
+- rules.ts: export const ROUND_UNIT = 10000; export const BASE_AMOUNT_TABLE: Record<EventType, Record<Relationship, number>> =; export const ATTEND_MULTIPLIER = 1.0; export const ABSENT_MULTIPLIER = 0.8; export const REGION_MULTIPLIER: Record<Region, number> =; export const INFLATION_MULTIPLIER = 1.05; export const NO_INFLATION_MULTIPLIER = 1.0; export const RANGE_MIN_RATIO = 0.8
 - settings.ts: export function getSettings(): AppSettings; export function saveSettings(partial: Partial<AppSettings>): Result<AppSettings>; export function unlockReward(now: number): Result<AppSettings>; export function isRewardUnlocked(now: number): boolean; export function updateSettings(partial: Partial<Settings>): Settings
 - storage.ts: export function readRecords(): GiftRecord[]; export function writeRecords(records: GiftRecord[]): Result<void>; export function readSettings(): AppSettings; export function writeSettings(settings: AppSettings): Result<void>; export function clearAll(): Result<void>
-- types.ts: export type EventType = "wedding" | "funeral" | "firstBirthday" | "etc"; export type Relationship = | "parents" | "siblings" | "spouse" | "children" | "relatives" | "friends" | "colleagues" | "; export type Region = | "seoul" | "gyeonggi" | "incheon" | "busan" | "daegu" | "daejeon" | "gwangju" | "ulsan" | "sejong"; export interface CalcInput; export interface CalcResult; export interface GiftRecord; export interface AppSettings; export interface StatsSummary
+- types.ts: export type EventType = "wedding" | "funeral" | "firstBirthday" | "etc"; export type Relationship = | "parents" | "siblings" | "spouse" | "children" | "relatives" | "friends" | "colleagues" | "; export type Region = | "seoul" | "gyeonggi" | "incheon" | "busan" | "daegu" | "daejeon" | "gwangju" | "ulsan" | "sejong"; export interface CalcInput; export interface CalcResult; export type AppErrorCode = 401 | 403 | 404 | 409 | 413 | 416 | 422 | 500 | 507; export type Result<T> = |; export interface GiftRecord
 - utils.ts: export function cn(...classes: (string | boolean | undefined | null)[]): string; export function formatNumber(n: number): string; export function formatCurrency(n: number, currency = 'KRW'): string
 
 ### Components (src/components/)
@@ -218,8 +222,10 @@ export interface RouteState {
 - TossRewardAd.tsx: TossRewardAd
 
 ### Module Dependencies (import graph)
+  lib/calc.ts → imports: lib/types, lib/rules
   lib/errors.ts → imports: lib/types
   lib/records.ts → imports: lib/types, lib/errors, lib/storage
+  lib/rules.ts → imports: lib/types
   lib/settings.ts → imports: lib/types, lib/contract, lib/errors, lib/storage
   lib/storage.ts → imports: lib/types, lib/errors
 CRITICAL: Before creating any new function, type, or component, check the list above. If something similar exists, import and use it.
@@ -230,74 +236,4 @@ CRITICAL: Before creating any new function, type, or component, check the list a
 - 0003: localStorage CRUD 기반 모듈 (키 격리 · 413 · 507) (files: src/lib/storage.ts, src/lib/storage.test.ts)
 - 0004: 레코드 도메인 연산 (409 중복·낙관적 잠금 · 404 · subscribeRecords) (files: src/lib/records.ts, src/lib/records.test.ts)
 - 0005: 설정 저장 계층 (확인 후 반영 · 리워드 24시간 해제) (files: src/lib/settings.ts, src/lib/settings.test.ts)
-
-## Available exports from existing files
-// src/App.tsx
-export default function App() {
-
-// src/components/AdSlot.tsx
-export function AdSlot({ adGroupId, className, variant, theme }: AdSlotProps) {
-
-// src/components/Amount.tsx
-export function Amount({
-
-// src/components/BottomCTA.tsx
-export function SubmitFooter({
-export function ButtonStack({
-
-// src/components/Card.tsx
-export function Card({
-
-// src/components/CountUp.tsx
-export function CountUp({
-
-// src/components/FloatingTabBar.tsx
-export type TabItem = {
-export function FloatingTabBar({ items }: { items: TabItem[] }) {
-
-// src/components/MiniBar.tsx
-export function MiniBar({
-
-// src/components/PageShell.tsx
-export function PageShell({ children, style }: { children: ReactNode; style?: CSSProperties }) {
-
-// src/components/ScreenScaffold.tsx
-export function ScreenScaffold({
-
-// src/components/Sparkline.tsx
-export function Sparkline({
-
-// src/components/StateView.tsx
-export function EmptyState({
-export function LoadingState({
-
-// src/components/SummaryHero.tsx
-export function SummaryHero({
-
-// src/components/TossPurchase.tsx
-export interface TossPurchaseResult {
-export function TossPurchase({
-
-// src/components/TossRewardAd.tsx
-export function TossRewardAd({
-
-// src/lib/contract.ts
-export type AppErrorCode = 'DUPLICATE_RECORD' | 'NOT_FOUND' | 'VALIDATION_ERROR' | 'STORAGE_ERROR' | 'NETWORK_ERROR';
-export type DomainRecord = { id: string; date: string; amountKrw: number; category?: string; memo?: string; createdAt: string; updatedAt: string };
-export type Settings = { rewardUnlockTime?: number; currency?: string; categoryFilters?: string[] };
-export type RouteState = 'home' | 'calc' | 'result' | 'history' | 'history/:id' | 'stats' | 'share' | 'settings';
-export type getErrorMessageFn = (code: AppErrorCode) => string;
-export type subscribeRecordsFn = (callback: (records: DomainRecord[]) => void) => () => void;
-export type createRecordFn = (data: Omit<DomainRecord, 'id' | 'createdAt' | 'updatedAt'>) => DomainRecord;
-export type updateRecordFn = (id: strin
-
-## Memory Index (자동 학습 — 힌트로만 사용, 실제 코드 확인 필수)
-
-Available topics: deploy(1), general(8)
-
-Key lessons (verify against actual code before applying):
-- [general] 의존 그래프 최하층의 타입·계약 파일은 런타임 코드 0줄의 순수 선언으로 가장 먼저 단독 타입체크를 통과시키고, 파일 생성은 셸 명령이 아닌 허용된 편집 도구로만 하게 강제하라. (60% · 타 앱 1회 — 맹신 금지)
-- [general] 영속 저장소에서 읽은 값은 항상 스키마 기본값으로 정규화해 배열·객체 타입을 보장한 뒤 반환하고, 화면은 빈/손상/부분 데이터에서도 렌더되도록 방어하라. (60% · 타 앱 1회 — 맹신 금지)
-- [general] 정책·기능 제거형 리팩터링은 화면과 도메인 로직 레이어에서만 수행하고, package.json의 플랫폼 필수 의존성(디자인 시스템·플랫폼 SDK·프레임워크 코어)은 어떤 경우에도 삭제하지 말 것 — 필수 패키지 화이트리스트를 빌드 전 가드로 검증하라. (60% · 타 앱 1회 — 맹신 금지)
-- [general] 공용 기반 모듈(상수·저장소·계산 유틸)이 실제로 머지되기 전에는 이를 import하는 화면·훅 패킷을 머지하지 말고, 모든 머지 게이트에 타입체크와 프로덕션 빌드 통과(미해결 import 0건)를 필수로 걸어라. (60% · 타 앱 1회 — 맹신 금지)
-- [general] 라우팅·Provider·전역 레이아웃 같은 단일 통합 배선 책임은 하나의 워크패킷에만 할당하고, 다른 패킷은 그 위에 페이지 내부 요소만 얹도록 경계를 명확히 나눠라. (60% · 타 앱 1회 — 맹신 금지)
+- 0006: 계산 엔진 (rules.ts 상수 격리 + calc.ts 결정론 함수) (files: src/lib/rules.ts, src/lib/calc.ts, src/lib/calc.test.ts)

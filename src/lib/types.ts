@@ -72,10 +72,19 @@ export interface AppSettings {
 }
 
 export interface StatsSummary {
-  totalRecords: number;
   totalAmount: number;
-  averageAmount: number;
-  eventTypeCounts: Record<EventType, number>;
+  count: number;
+  avgAmount: number;
+  byEventType: Array<{
+    type: EventType;
+    amount: number;
+    ratio: number;
+  }>;
+  monthlyTrend: Array<{
+    month: string; // YYYY-MM format
+    amount: number;
+  }>;
+  topRelationship: Relationship | null;
 }
 
 export type RouteState = {
