@@ -174,6 +174,7 @@ export type RouteState = {
     FloatingTabBar.tsx
     MiniBar.tsx
     PageShell.tsx
+    RewardGate.tsx
     ScreenScaffold.tsx
     Sparkline.tsx
     StateView.tsx
@@ -227,6 +228,7 @@ export type RouteState = {
 - FloatingTabBar.tsx: FloatingTabBar
 - MiniBar.tsx: MiniBar
 - PageShell.tsx: PageShell
+- RewardGate.tsx: RewardGate
 - ScreenScaffold.tsx: ScreenScaffold
 - Sparkline.tsx: Sparkline
 - StateView.tsx: EmptyState, LoadingState
@@ -252,6 +254,7 @@ CRITICAL: Before creating any new function, type, or component, check the list a
 - 0005: 설정 저장 계층 (확인 후 반영 · 리워드 24시간 해제) (files: src/lib/settings.ts, src/lib/settings.test.ts)
 - 0006: 계산 엔진 (rules.ts 상수 격리 + calc.ts 결정론 함수) (files: src/lib/rules.ts, src/lib/calc.ts, src/lib/calc.test.ts)
 - 0007: 통계 집계 함수 + 상태 관리 훅 (useRecords · useSettings) (files: src/lib/stats.ts, src/lib/stats.test.ts, src/hooks/useRecords.ts, src/hooks/useSettings.ts)
+- 0011: 결과 상세 리워드 게이트 (TossRewardAd · 24시간 해제) (files: src/components/RewardGate.tsx, src/components/RewardGate.test.tsx)
 
 ## Available exports from existing files
 // src/App.tsx
@@ -282,6 +285,9 @@ export function MiniBar({
 
 // src/components/PageShell.tsx
 export function PageShell({ children, style }: { children: ReactNode; style?: CSSProperties }) {
+
+// src/components/RewardGate.tsx
+export function RewardGate({ children, lockedPreview, slotId = DEFAULT_SLOT_ID }: RewardGateProps) {
 
 // src/components/ScreenScaffold.tsx
 export function ScreenScaffold({
@@ -316,9 +322,7 @@ export function calculate(input: CalcInput): CalcResult {
 export type AppErrorCode = 'DUPLICATE_RECORD' | 'NOT_FOUND' | 'VALIDATION_ERROR' | 'STORAGE_ERROR' | 'NETWORK_ERROR';
 export type DomainRecord = { id: string; date: string; amountKrw: number; category?: string; memo?: string; createdAt: string; updatedAt: string };
 export type Settings = { rewardUnlockTime?: number; currency?: string; categoryFilters?: string[] };
-export type RouteState = 'home' | 'calc' | 'result' | 'history' | 'history/:id' | 'stats' | 'share' | 'settings';
-export type getErrorMessageFn = (code: AppErrorCode) => string;
-export type subscribeRecordsFn = (callba
+export type RouteState = 'home' | 'calc' | 'result' | 'history' | 'history/:id' | '
 
 ## Memory Index (자동 학습 — 힌트로만 사용, 실제 코드 확인 필수)
 
