@@ -5,6 +5,7 @@ import History from './pages/History';
 import HistoryDetail from './pages/HistoryDetail';
 import Stats from './pages/Stats';
 import Share from './pages/Share';
+import Settings from './pages/Settings';
 
 // Dev-only TDS Gallery route — `import.meta.env.DEV` is statically replaced
 // (true in dev, false in prod) so the entire import + Route is tree-shaken
@@ -21,6 +22,7 @@ export default function App() {
       <Route path="/history/:id" element={<HistoryDetail />} />
       <Route path="/stats" element={<Stats />} />
       <Route path="/share" element={<Share />} />
+      <Route path="/settings" element={<Settings />} />
       {DevTdsGallery && (
         <Route
           path="/__tds-gallery"
