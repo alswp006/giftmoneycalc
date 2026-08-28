@@ -6,10 +6,10 @@
  */
 
 /** 모든 패킷이 참조하는 에러 코드 열거형 (구현: 패킷 0001) */
-export type AppErrorCode = type AppErrorCode = 'DUPLICATE_RECORD' | 'NOT_FOUND' | 'VALIDATION_ERROR' | 'STORAGE_ERROR' | 'NETWORK_ERROR';
+export type AppErrorCode = 'DUPLICATE_RECORD' | 'NOT_FOUND' | 'VALIDATION_ERROR' | 'STORAGE_ERROR' | 'NETWORK_ERROR';
 
 /** 도메인 엔티티 - 0004 연산, 0007+ UI 전역 (구현: 패킷 0001) */
-export type Record = { id: string; date: string; amountKrw: number; category?: string; memo?: string; createdAt: string; updatedAt: string };
+export type DomainRecord = { id: string; date: string; amountKrw: number; category?: string; memo?: string; createdAt: string; updatedAt: string };
 
 /** 설정 저장소 - 0005 관리, 0018 UI (구현: 패킷 0001) */
 export type Settings = { rewardUnlockTime?: number; currency?: string; categoryFilters?: string[] };
@@ -21,19 +21,19 @@ export type RouteState = 'home' | 'calc' | 'result' | 'history' | 'history/:id' 
 export type getErrorMessageFn = (code: AppErrorCode) => string;
 
 /** 레코드 변경 구독 - 0007 훅 기초, 0012+ UI 반응 (구현: 패킷 0004) */
-export type subscribeRecordsFn = (callback: (records: Record[]) => void) => () => void;
+export type subscribeRecordsFn = (callback: (records: DomainRecord[]) => void) => () => void;
 
 /** 레코드 생성 - 0009 calc, 0013 sheet (구현: 패킷 0004) */
-export type createRecordFn = (data: Omit<Record, 'id' | 'createdAt' | 'updatedAt'>) => Record;
+export type createRecordFn = (data: Omit<DomainRecord, 'id' | 'createdAt' | 'updatedAt'>) => DomainRecord;
 
 /** 레코드 수정 - 0013 sheet, 0014 detail (구현: 패킷 0004) */
-export type updateRecordFn = (id: string, data: Partial<Omit<Record, 'id' | 'createdAt' | 'updatedAt'>>) => Record;
+export type updateRecordFn = (id: string, data: Partial<Omit<DomainRecord, 'id' | 'createdAt' | 'updatedAt'>>) => DomainRecord;
 
 /** 레코드 삭제 - 0014 detail (구현: 패킷 0004) */
 export type deleteRecordFn = (id: string) => void;
 
 /** 필터 조회 - 0012 history, 0015 stats (구현: 패킷 0004) */
-export type queryRecordsFn = (filter?: { category?: string; startDate?: string; endDate?: string }) => Record[];
+export type queryRecordsFn = (filter?: { category?: string; startDate?: string; endDate?: string }) => DomainRecord[];
 
 /** 설정 부분 갱신 - 0018 settings page (구현: 패킷 0005) */
 export type updateSettingsFn = (partial: Partial<Settings>) => Settings;
