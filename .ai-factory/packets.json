@@ -1,0 +1,742 @@
+[
+  {
+    "id": "0001",
+    "title": "도메인 타입 · AppErrorCode · RouteState 정의",
+    "epic": "Epic 1: 데이터/타입",
+    "task": {
+      "description": "앱 전체 엔티티와 화면 간 이동 계약을 순수 타입으로 선언한다. EventType/Relationship/Region/CalcInput/CalcResult/GiftRecord/AppSettings/StatsSummary/AppErrorCode/Result<T>/RouteState를 export한다. 런타임 코드(함수·상수 선언) 0줄이며 타입·인터페이스만 존재한다. RouteState는 6개 라우트 키를 전부 포함해 각 페이지가 location.state를 캐스팅하지 않고 재사용하게 한다.",
+      "acceptance_criteria": [
+        "src/lib/types.ts가 EventType('wedding'|'funeral'|'firstBirthday'|'etc'), Relationship, Region, CalcInput, CalcResult, GiftRecord, AppSettings, StatsSummary, AppErrorCode(401|403|404|409|413|416|422|500|507), Result<T>를 전부 export한다",
+        "RouteState 타입이 '/', '/calc', '/result', '/history', '/share', '/settings' 6개 키를 모두 포함하고 '/share'는 { input: CalcInput; result: CalcResult }를 갖는다",
+        "npx tsc --noEmit 종료 코드가 0이다",
+        "grep -cE '^(export )?(const|function|let|var|class) ' src/lib/types.ts 결과가 0이다"
+      ],
+      "acceptance_criteria_note": ""
+    },
+    "covers": [
+      "Data Models(AppErrorCode/Result)",
+      "S4~S8 Navigation state contract",
+      "F1 기반 타입"
+    ],
+    "files": [
+      "src/lib/types.ts"
+    ],
+    "definition_of_done": [
+      "tsc --noEmit 통과",
+      "타입만 존재(런타임 심볼 0개)",
+      "RouteState 6키 전부 정의"
+    ],
+    "depends_on": [],
+    "db_schema": "interface GiftRecord { id: string; personName: string; eventType: EventType; relationship: Relationship; eventDate: string /* YYYY-MM-DD */; amount: number; memo?: string; createdAt: number; updatedAt: number } → localStorage key: 'gmc:records' / interface AppSettings { defaultRegion: Region; inflationAdjustDefault: boolean; rewardUnlockedUntil: number | null } → localStorage key: 'gmc:settings'",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": ""
+  },
+  {
+    "id": "0002",
+    "title": "오류 문구 단일 소스 errors.ts + 하드코딩 검증 스크립트",
+    "epic": "Epic 1: 데이터/타입",
+    "task": {
+      "description": "AppErrorCode → 사용자 노출 문구를 1개 파일에 격리한다. ERROR_MESSAGES와 ok/fail 헬퍼를 export하고, UI에 코드 숫자가 절대 노출되지 않음을 테스트로 고정한다. 페이지/컴포넌트에서 오류 문구를 하드코딩하지 못하도록 CI 스크립트로 정적 검증한다(AC-G9).",
+      "acceptance_criteria": [
+        "src/lib/errors.ts가 ERROR_MESSAGES: Record<AppErrorCode, string>와 fail(code): Result<never>, ok<T>(data): Result<T>를 export한다",
+        "문구가 SPEC과 문자 단위 일치: 409='다른 화면에서 이미 수정된 기록이에요. 새로고침 후 다시 시도해주세요', 404='삭제되었거나 없는 기록이에요', 500='광고를 불러오지 못했어요. 잠시 후 다시 시도해주세요', 401='토스 앱에서 광고를 보면 상세 리포트를 열 수 있어요', 416='모든 기록을 다 봤어요'",
+        "src/lib/errors.test.ts가 Object.keys(ERROR_MESSAGES).length === 9, 모든 값이 비어있지 않음, 어떤 값도 /[0-9]{3}/를 포함하지 않음을 검증하고 통과한다",
+        "node scripts/check-error-source.mjs가 src/pages·src/components에서 '잠시 후 다시 시도' 하드코딩 0건을 확인하고 종료 코드 0을 반환한다"
+      ]
+    },
+    "covers": [
+      "AC-G9",
+      "F1 AC-5 문구",
+      "F1 AC-6 문구",
+      "Error Model 표"
+    ],
+    "files": [
+      "src/lib/errors.ts",
+      "src/lib/errors.test.ts",
+      "scripts/check-error-source.mjs"
+    ],
+    "definition_of_done": [
+      "errors.test.ts 3케이스 통과",
+      "check-error-source.mjs 종료 코드 0",
+      "tsc --noEmit 통과"
+    ],
+    "depends_on": [
+      "0001"
+    ],
+    "db_schema": "",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": ""
+  },
+  {
+    "id": "0003",
+    "title": "localStorage CRUD 기반 모듈 (키 격리 · 413 · 507)",
+    "epic": "Epic 1: 데이터/타입",
+    "task": {
+      "description": "gmc: 네임스페이스 단일 접근 지점을 만든다. readRecords/writeRecords/readSettings/writeSettings/clearAll을 구현하고 1,000건 상한(413), QuotaExceededError(507), JSON 파싱 실패 폴백을 처리한다. 앱 전체에서 localStorage 직접 접근은 이 파일에만 존재해 403 정적 격리 전제를 만든다.",
+      "acceptance_criteria": [
+        "src/lib/storage.ts가 readRecords(): GiftRecord[], writeRecords(rs): Result<void>, readSettings(): AppSettings, writeSettings(s): Result<void>, clearAll(): Result<void>를 export한다",
+        "사용 키가 'gmc:records', 'gmc:settings' 2개뿐이고 grep -rn \"localStorage\" src --include=*.ts --include=*.tsx | grep -v \"src/lib/storage.ts\" 결과가 0건이다",
+        "레코드 1,001건 저장 시도 시 { ok:false, code:413 }을 반환하고 저장된 기존 값이 바뀌지 않는다",
+        "setItem이 QuotaExceededError를 throw하도록 모킹하면 { ok:false, code:507 }을 반환하고 기존 저장값이 불변이다",
+        "JSON.parse 실패 시 throw 없이 readRecords는 [], readSettings는 기본 설정을 반환하며 storage.test.ts 5케이스(정상 R/W·413·507·파싱깨짐·clearAll)가 통과한다"
+      ]
+    },
+    "covers": [
+      "F1 AC-1~AC-4",
+      "F1 AC-5(413)",
+      "F1 AC-6(507)",
+      "F1 AC-7",
+      "F1 AC-8",
+      "F8 AC-11(403 격리 전제)"
+    ],
+    "files": [
+      "src/lib/storage.ts",
+      "src/lib/storage.test.ts"
+    ],
+    "definition_of_done": [
+      "storage.test.ts 5케이스 통과",
+      "localStorage 접근 grep 0건(storage.ts 제외)",
+      "tsc --noEmit 통과"
+    ],
+    "depends_on": [
+      "0001",
+      "0002"
+    ],
+    "db_schema": "GiftRecord[] → localStorage key 'gmc:records' (최대 1000건) / AppSettings → localStorage key 'gmc:settings'",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": ""
+  },
+  {
+    "id": "0004",
+    "title": "레코드 도메인 연산 (409 중복·낙관적 잠금 · 404 · subscribeRecords)",
+    "epic": "Epic 1: 데이터/타입",
+    "task": {
+      "description": "storage.ts 위에 레코드 생성/수정/삭제 규칙과 변경 구독을 얹는다. crypto.randomUUID 충돌 재시도, personName|eventDate|eventType 중복 감지(force로 우회 가능한 소프트 차단), updatedAt 기반 낙관적 잠금, 404 처리, 같은 탭·다른 탭 모두에서 발화하는 subscribeRecords를 구현한다.",
+      "acceptance_criteria": [
+        "src/lib/records.ts가 createRecord(input, opts?: { force?: boolean }): Result<GiftRecord>, updateRecord(id, patch, baseUpdatedAt): Result<GiftRecord>, deleteRecord(id): Result<void>, subscribeRecords(cb): () => void를 export한다",
+        "ID는 crypto.randomUUID()로 만들고 기존 ID와 충돌 시 최대 3회 재생성, 계속 충돌하면 { ok:false, code:409 }를 반환한다",
+        "personName|eventDate|eventType이 동일한 레코드가 있으면 { ok:false, code:409 }, 동일 호출에 { force: true }를 주면 저장에 성공해 두 레코드가 공존한다",
+        "updateRecord의 baseUpdatedAt이 저장된 updatedAt과 다르면 { ok:false, code:409 }이고 저장값이 불변이며, 없는 id로 update/delete하면 { ok:false, code:404 }다",
+        "subscribeRecords 콜백이 다른 탭 storage 이벤트와 같은 탭 create/update/delete 양쪽 모두에서 호출되고, unsubscribe 후에는 호출 0회이며 records.test.ts 8케이스가 통과한다"
+      ]
+    },
+    "covers": [
+      "F1 AC-9",
+      "F1 AC-10",
+      "F1 AC-11",
+      "F1 AC-12",
+      "F1 AC-13"
+    ],
+    "files": [
+      "src/lib/records.ts",
+      "src/lib/records.test.ts"
+    ],
+    "definition_of_done": [
+      "records.test.ts 8케이스 통과",
+      "같은 탭 이벤트 버스 병행 발행 확인",
+      "tsc --noEmit 통과"
+    ],
+    "depends_on": [
+      "0003"
+    ],
+    "db_schema": "GiftRecord (localStorage 'gmc:records') — 낙관적 잠금 키는 updatedAt(epoch ms), 중복 판정 키는 personName|eventDate|eventType",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": ""
+  },
+  {
+    "id": "0005",
+    "title": "설정 저장 계층 (확인 후 반영 · 리워드 24시간 해제)",
+    "epic": "Epic 1: 데이터/타입",
+    "task": {
+      "description": "설정 읽기/쓰기와 리워드 24시간 해제 플래그를 순수 함수로 제공한다. 낙관적 UI 업데이트를 쓰지 않고 저장 성공 시에만 갱신 값을 반환하며, 실패 시 이전 값이 완전히 보존됨을 테스트로 고정한다. 유니온 밖 region 값은 422로 거부한다.",
+      "acceptance_criteria": [
+        "src/lib/settings.ts가 getSettings(), saveSettings(partial): Result<AppSettings>, unlockReward(now): Result<AppSettings>, isRewardUnlocked(now): boolean을 export한다",
+        "saveSettings 실패 시 { ok:false, code:500|507 }를 반환하고 이어진 getSettings()가 이전 값과 deep-equal이다",
+        "unlockReward(t) 후 rewardUnlockedUntil === t + 86400000이고 isRewardUnlocked(t + 86399999) === true, isRewardUnlocked(t + 86400001) === false다",
+        "유니온 밖 region 문자열 저장 시도 시 { ok:false, code:422 }이고 저장값이 불변이며 settings.test.ts 6케이스가 통과한다"
+      ]
+    },
+    "covers": [
+      "F8 AC-5",
+      "F8 AC-12",
+      "F3 AC-9",
+      "F4 리워드 해제 상태"
+    ],
+    "files": [
+      "src/lib/settings.ts",
+      "src/lib/settings.test.ts"
+    ],
+    "definition_of_done": [
+      "settings.test.ts 6케이스 통과",
+      "낙관적 업데이트 코드 0건",
+      "tsc --noEmit 통과"
+    ],
+    "depends_on": [
+      "0003"
+    ],
+    "db_schema": "AppSettings { defaultRegion; inflationAdjustDefault; rewardUnlockedUntil } → localStorage key 'gmc:settings'",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": ""
+  },
+  {
+    "id": "0006",
+    "title": "계산 엔진 (rules.ts 상수 격리 + calc.ts 결정론 함수)",
+    "epic": "Epic 1: 데이터/타입",
+    "task": {
+      "description": "기준 금액표(3만/5만/10만 단위), 참석 배수, 지역·물가 보정 계수를 rules.ts에 상수로만 격리하고, calc.ts에 결정론 calculate(input) 함수를 구현한다. Math.random·Date.now를 쓰지 않아 동일 입력이 항상 동일 결과를 낸다.",
+      "acceptance_criteria": [
+        "src/lib/rules.ts가 행사유형×관계 기준 금액표, 참석 배수, 지역 보정 계수, 물가 보정 계수를 상수만 export하고 함수 선언이 0개다",
+        "calculate(input: CalcInput): CalcResult가 동일 입력 100회 호출 시 100회 모두 동일 객체 값을 반환한다",
+        "반환 금액이 항상 10,000원 단위로 반올림되고 rangeMin <= recommendedAmount <= rangeMax를 항상 만족한다",
+        "reasons 배열 길이가 항상 2 이상이고 각 원소가 빈 문자열이 아니다",
+        "grep -rn 'Math.random\\|Date.now' src/lib/calc.ts src/lib/rules.ts 결과 0건이며 calc.test.ts의 행사유형 4종 × 관계 등급 전체 테이블 테스트가 명시 기대값으로 통과한다"
+      ]
+    },
+    "covers": [
+      "F2 전체",
+      "Assumption 2"
+    ],
+    "files": [
+      "src/lib/rules.ts",
+      "src/lib/calc.ts",
+      "src/lib/calc.test.ts"
+    ],
+    "definition_of_done": [
+      "calc.test.ts 테이블 테스트 전부 통과",
+      "rules.ts 함수 0개",
+      "tsc --noEmit 통과"
+    ],
+    "depends_on": [
+      "0001"
+    ],
+    "db_schema": "",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": ""
+  },
+  {
+    "id": "0007",
+    "title": "통계 집계 함수 + 상태 관리 훅 (useRecords · useSettings)",
+    "epic": "Epic 1: 데이터/타입",
+    "task": {
+      "description": "레코드 배열을 통계 화면용 집계 결과로 변환하는 순수 함수 aggregate와, 화면이 쓰는 React 훅 useRecords/useSettings를 만든다. 훅은 subscribeRecords를 구독해 다른 탭·같은 탭 변경 시 자동 재계산되고, 언마운트 시 구독을 해제한다. 렌더 코드는 포함하지 않는다.",
+      "acceptance_criteria": [
+        "src/lib/stats.ts가 aggregate(records, now): StatsSummary를 export하고 { totalAmount, count, avgAmount, byEventType[], monthlyTrend[], topRelationship }를 채운다",
+        "records가 빈 배열이면 aggregate가 throw 없이 totalAmount=0, count=0, byEventType=[], topRelationship=null을 반환한다",
+        "byEventType의 ratio 합이 1±0.001 이내이고 monthlyTrend는 최근 6개월치가 오름차순 month 문자열(YYYY-MM)로 정렬된다",
+        "src/hooks/useRecords.ts가 { records, loading, reload }를, src/hooks/useSettings.ts가 { settings, save, saving }를 반환하고 useRecords는 subscribeRecords 변경 시 records가 갱신된다",
+        "두 훅 모두 언마운트 시 unsubscribe가 호출되어 이후 콜백 호출 0회이며 stats.test.ts 4케이스가 통과한다"
+      ]
+    },
+    "covers": [
+      "F6 집계",
+      "F1 AC-13",
+      "F8 AC-12"
+    ],
+    "files": [
+      "src/lib/stats.ts",
+      "src/lib/stats.test.ts",
+      "src/hooks/useRecords.ts",
+      "src/hooks/useSettings.ts"
+    ],
+    "definition_of_done": [
+      "stats.test.ts 4케이스 통과",
+      "훅 언마운트 시 구독 해제 확인",
+      "tsc --noEmit 통과"
+    ],
+    "depends_on": [
+      "0004",
+      "0005"
+    ],
+    "db_schema": "StatsSummary { totalAmount: number; count: number; avgAmount: number; byEventType: { type; amount; ratio }[]; monthlyTrend: { month: string; amount: number }[]; topRelationship: string | null } (types.ts에 추가)",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": ""
+  },
+  {
+    "id": "0008",
+    "title": "홈 화면 `/`",
+    "epic": "Epic 2: 페이지",
+    "task": {
+      "description": "이번 달 경조사비를 시각 앵커로 보여주는 탭-루트 홈을 만든다. SummaryHero(CountUp) + 바로 계산 Chip 행 + 최근 기록 3건 ListRow + 목록 끝 AdSlot 구성이며, 기록 0건이어도 Hero는 0원으로 유지되고 최근 기록 자리에만 EmptyState를 노출한다. SubmitFooter는 쓰지 않는다(FloatingTabBar 겹침 금지).",
+      "acceptance_criteria": [
+        "/ 진입 시 data-testid='home-hero' SummaryHero가 이번 달 총액을 CountUp으로 표시하고 caption에 '{n}건 기록했어요'가 나온다",
+        "기록 0건일 때 Hero가 숨겨지지 않고 '0원'을 표시하며 최근 기록 영역에 EmptyState(title='아직 기록이 없어요')와 '계산하기' Button이 렌더된다",
+        "'권장 금액 계산하기' 버튼 탭 시 generateHapticFeedback({type:'success'})가 try/catch로 호출된 뒤 navigate('/calc')가 실행된다",
+        "행사 Chip 탭 시 navigate('/calc', { state: { prefill: { eventType } } })로 이동하고, 최근 기록 행 탭 시 navigate('/history/'+id)로 이동한다",
+        "VITE_TOSS_AD_GROUP_ID가 빈 값이면 AdSlot이 아무것도 렌더하지 않고 나머지 레이아웃 높이가 변하지 않는다"
+      ]
+    },
+    "covers": [
+      "F3 홈",
+      "S1 Navigation state contract"
+    ],
+    "files": [
+      "src/pages/Home.tsx"
+    ],
+    "definition_of_done": [
+      "로딩/빈/오류 3상태 모두 렌더",
+      "해피 패스 수동 확인",
+      "tsc --noEmit 통과"
+    ],
+    "depends_on": [
+      "0007"
+    ],
+    "db_schema": "",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": "Pattern: PageShell (탭-루트 홈 골든 조합: ScreenScaffold + SummaryHero + FloatingTabBar)\nTDS whitelist: Top, Paragraph, Spacing, Chip, ListRow, Button, Toast + 템플릿 ScreenScaffold, SummaryHero, CountUp, Amount, Card, EmptyState, LoadingState, AdSlot, FloatingTabBar\nLayout:\n<ScreenScaffold top={<Top title={<Top.TitleParagraph>경조사비 계산기</Top.TitleParagraph>} />}>\n  <SummaryHero label=\"이번 달 경조사비\" value={<CountUp value={monthTotal} unit=\"원\" typography=\"t1\" />} caption={`${monthCount}건 기록했어요`} testId=\"home-hero\" />\n  <Spacing size={12} />\n  <Button variant=\"fill\" display=\"block\" size=\"large\" onClick={goCalc}>권장 금액 계산하기</Button>\n  <Spacing size={24} />\n  <Paragraph.Text typography=\"t4\">바로 계산</Paragraph.Text>\n  <Spacing size={12} />\n  <div style={{ display:'flex', gap:8, overflowX:'auto' }}><Chip label=\"결혼식\" variant=\"outlined\" onClick={()=>goCalc('wedding')} /><Chip label=\"장례식\" variant=\"outlined\" /><Chip label=\"돌잔치\" variant=\"outlined\" /></div>\n  <Spacing size={24} />\n  <Paragraph.Text typography=\"t4\">최근 기록</Paragraph.Text>\n  <Spacing size={12} />\n  {/* 최대 3건 */}\n  <ListRow contents={<ListRow.Texts type=\"2RowTypeA\" top=\"김서준 · 결혼식\" bottom=\"2026.08.22\" />} right={<Amount value={100000} unit=\"원\" typography=\"st11\" />} onClick={goDetail} />\n  <Spacing size={16} />\n  <AdSlot adGroupId={import.meta.env.VITE_TOSS_AD_GROUP_ID} />\n</ScreenScaffold>\n<FloatingTabBar />\nStates: Loading=Hero 자리 LoadingState(rows=1) + 최근 기록 LoadingState(rows=3) / Empty=Hero는 0원 유지(숨김 금지), 최근 기록 자리에 EmptyState title='아직 기록이 없어요' description='계산하고 바로 기록해 보세요' action=<Button variant=\"weak\" display=\"block\">계산하기</Button> / Error(500)=Hero 0원 폴백 + Toast(errors.ts 문구), 흰 화면 금지\nInteractions: CTA 탭 → generateHapticFeedback({type:'success'}) → navigate('/calc') / Chip 탭 → tickWeak → navigate('/calc', { state:{ prefillEventType } }) / 최근 기록 행 → navigate('/history/'+id) / 탭바 전환 → tickWeak / 광고 env 미설정 시 AdSlot 무렌더(레이아웃 유지)\n주의: 탭-루트이므로 SubmitFooter 금지, ListRow padding prop 없음, HEX 하드코딩 금지, SDK 호출 try/catch"
+  },
+  {
+    "id": "0009",
+    "title": "계산 입력 화면 `/calc`",
+    "epic": "Epic 2: 페이지",
+    "task": {
+      "description": "행사 유형·관계 Chip 선택, 지역 BottomSheet, 물가 보정 Switch, 메모 TextField로 CalcInput을 구성하고 SubmitFooter로 /result로 넘긴다. 홈에서 넘어온 prefill을 초기값에 반영하고, 저장된 defaultRegion이 유효하지 않으면(422) 기본 지역으로 대체한다.",
+      "acceptance_criteria": [
+        "필수 항목(eventType, relationship) 중 하나라도 미선택이면 SubmitFooter가 disabled이고 둘 다 선택되면 활성화된다",
+        "location.state.prefill.eventType이 있으면 해당 Chip이 selected=true(variant='filled')로 초기 렌더된다",
+        "'지역' ListRow 탭 시 BottomSheet가 열리고 지역 선택 후 닫히며 ListRow bottom 텍스트가 선택한 지역명으로 바뀐다",
+        "저장된 defaultRegion이 Region 유니온 밖 값이면 화면이 흰 화면 없이 기본 지역으로 대체 표시되고 사용자가 선택한 region 값은 제출 시 그대로 CalcInput에 보존된다",
+        "제출 시 tickWeak 후 navigate('/result', { state: { input } })가 호출되고 input이 RouteState['/result'] 타입과 일치한다"
+      ]
+    },
+    "covers": [
+      "F3 계산 입력",
+      "F3 AC-9",
+      "S2 Navigation state contract"
+    ],
+    "files": [
+      "src/pages/Calc.tsx"
+    ],
+    "definition_of_done": [
+      "폼 검증·prefill·BottomSheet 동작 확인",
+      "tsc --noEmit 통과"
+    ],
+    "depends_on": [
+      "0006",
+      "0007"
+    ],
+    "db_schema": "",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": "Pattern: FixedBottomCTA (ScreenScaffold + Chip 선택 폼 + SubmitFooter)\nTDS whitelist: Top, Paragraph, Spacing, Chip, TextField, Switch, ListRow, BottomSheet, Toast + ScreenScaffold, Card, SubmitFooter\nLayout:\n<ScreenScaffold top={<Top title={<Top.TitleParagraph>경조사비 계산</Top.TitleParagraph>} />} bottom={<SubmitFooter label=\"권장 금액 계산하기\" onClick={submit} disabled={!valid} />}>\n  <Paragraph.Text typography=\"t4\">어떤 자리인가요?</Paragraph.Text>\n  <Spacing size={12} />\n  <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}><Chip label=\"결혼식\" variant={eventType==='wedding'?'filled':'outlined'} selected={eventType==='wedding'} /><Chip label=\"장례식\" variant=\"outlined\" /><Chip label=\"돌잔치\" variant=\"outlined\" /></div>\n  <Spacing size={24} />\n  <Paragraph.Text typography=\"t4\">상대와의 관계</Paragraph.Text>\n  <Spacing size={12} />\n  <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}><Chip label=\"가족\" variant=\"outlined\" /><Chip label=\"친한 친구\" variant=\"outlined\" /><Chip label=\"직장 동료\" variant=\"outlined\" /><Chip label=\"지인\" variant=\"outlined\" /></div>\n  <Spacing size={24} />\n  <Card testId=\"calc-options\">\n    <ListRow contents={<ListRow.Texts type=\"2RowTypeA\" top=\"지역\" bottom={regionLabel} />} onClick={openRegionSheet} />\n    <ListRow contents={<ListRow.Texts type=\"2RowTypeA\" top=\"물가 보정\" bottom=\"지역 물가를 반영해요\" />} right={<Switch checked={adjust} onChange={toggleAdjust} />} />\n  </Card>\n  <Spacing size={16} />\n  <TextField variant=\"box\" label=\"참석 여부 메모\" placeholder=\"예: 식사까지 참석\" value={memo} onChange={setMemo} />\n  <Spacing size={80} />\n  <BottomSheet open={sheetOpen} onClose={closeSheet} title=\"지역을 선택해주세요\">{/* 지역 목록 */}</BottomSheet>\n</ScreenScaffold>\nStates: Loading=설정 로드 중 Card 자리 LoadingState(rows=2) / Empty 해당 없음 / Error(422)=저장된 region이 유니온 밖이면 기본 지역으로 대체 + Toast(errors.ts) / 미선택 시 SubmitFooter disabled\nInteractions: Chip 탭 → tickWeak + 선택 토글 / 지역 ListRow → BottomSheet 오픈, 선택 시 닫힘 / Switch → tickWeak / 제출 → tickWeak → navigate('/result', { state:{ input } })\n주의: SubmitFooter 안에 Button 금지(label만), TextField variant+placeholder 필수, ListRow padding prop 없음, SDK try/catch"
+  },
+  {
+    "id": "0010",
+    "title": "결과 화면 `/result` — 기본 레이아웃",
+    "epic": "Epic 2: 페이지",
+    "task": {
+      "description": "calculate(input)로 권장 금액과 범위를 계산해 result-hero에 표시하고 근거 reasons를 카드로 보여준다. location.state가 없으면 흰 화면 대신 /로 replace 리다이렉트한다. 하단 SubmitFooter는 '기록에 추가하기', 보조 버튼으로 '공유 카드 만들기'를 둔다.",
+      "acceptance_criteria": [
+        "location.state가 null이면 렌더 대신 navigate('/', { replace: true })가 실행되어 흰 화면이 나오지 않는다",
+        "data-testid='result-hero'에 권장 금액이 t1 이상 타이포로, 그 아래 rangeMin~rangeMax 범위 텍스트가 표시된다",
+        "reasons 배열의 모든 원소가 각각 ListRow 또는 Paragraph.Text 한 줄로 렌더된다(2개 이상)",
+        "'기록에 추가하기' 탭 시 navigate('/history', { state: { prefill: { ...input, recommendedAmount } } })가 호출된다",
+        "'공유 카드 만들기' 탭 시 navigate('/share', { state: { input, result } })가 호출되고 두 필드명이 RouteState['/share']와 일치한다"
+      ]
+    },
+    "covers": [
+      "F4 결과 레이아웃",
+      "S3 Navigation state contract"
+    ],
+    "files": [
+      "src/pages/Result.tsx"
+    ],
+    "definition_of_done": [
+      "state null 리다이렉트 확인",
+      "result-hero testId 존재",
+      "tsc --noEmit 통과"
+    ],
+    "depends_on": [
+      "0006"
+    ],
+    "db_schema": "",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": "Pattern: FixedBottomCTA (비-탭 화면이므로 SubmitFooter 사용 허용)\nTDS whitelist: Top(뒤로가기), Paragraph, Spacing, Chip, ListRow, Button, Toast + ScreenScaffold, SummaryHero, CountUp, Amount, Card, LoadingState, SubmitFooter\nLayout: <ScreenScaffold top={<Top title={<Top.TitleParagraph>권장 금액</Top.TitleParagraph>} />} bottom={<SubmitFooter label=\"기록에 추가하기\" onClick={goHistoryWithPrefill} />}>\n  <SummaryHero testId=\"result-hero\" label=\"이 자리엔\" value={<CountUp value={result.recommendedAmount} unit=\"원\" typography=\"t1\" />} caption={`보통 ${range} 사이예요`} />\n  <Spacing size={16} />\n  <div style={{display:'flex',gap:8,flexWrap:'wrap'}}><Chip label={eventLabel} variant=\"outlined\" /><Chip label={relationLabel} variant=\"outlined\" /></div>\n  <Spacing size={24} />\n  <Paragraph.Text typography=\"t4\">이렇게 계산했어요</Paragraph.Text><Spacing size={12} />\n  <Card>{reasons.map(r => <ListRow key={r} contents={<ListRow.Texts type=\"1RowTypeA\" top={r} />} />)}</Card>\n  <Spacing size={16} />\n  <Button variant=\"weak\" display=\"block\" size=\"large\" onClick={goShare}>공유 카드 만들기</Button>\n  <Spacing size={80} />\n</ScreenScaffold>\nStates: Loading=Hero LoadingState(rows=1)+Card LoadingState(rows=2) / Empty·Error(404 등가)=location.state null이면 navigate('/', {replace:true}) / 금액은 Amount·CountUp으로 nowrap\nInteractions: CTA → generateHapticFeedback({type:'success'}) → navigate('/history', { state:{ prefill:{...input, recommendedAmount} } }) / 공유 → navigate('/share', { state:{ input, result } }) / 뒤로가기 → navigate(-1)\n주의: 문구는 errors.ts 단일 소스, HEX 금지, SDK try/catch, 상세 리포트 영역은 별도 패킷이 게이트로 감싼다"
+  },
+  {
+    "id": "0011",
+    "title": "결과 상세 리워드 게이트 (TossRewardAd · 24시간 해제)",
+    "epic": "Epic 2: 페이지",
+    "task": {
+      "description": "결과 화면 하단의 상세 리포트 섹션을 TossRewardAd로 게이트하는 재사용 컴포넌트를 만든다. 잠금 상태에서는 블러 미리보기만 보이고 수치 텍스트는 DOM에 렌더되지 않으며, 광고 시청 성공 시 unlockReward(now)로 24시간 해제한다. 토스 앱 밖(401)에서는 해제 버튼 대신 안내 문구를 노출한다.",
+      "acceptance_criteria": [
+        "src/components/RewardGate.tsx가 { children, lockedPreview }를 받아 isRewardUnlocked(Date.now())가 false면 children을 렌더하지 않는다(잠금 시 상세 수치 문자열이 document에 0건)",
+        "해제 버튼 탭 → TossRewardAd 시청 완료 콜백에서 unlockReward(Date.now())가 호출되고 성공 시 children이 즉시 렌더된다",
+        "광고 로드/시청 실패 시 ERROR_MESSAGES[500] 문구를 Toast로 노출하고 잠금 상태가 유지된다",
+        "토스 앱 외부 실행(getIsTossLoginIntegratedService 실패 또는 SDK 미지원)에서는 해제 버튼 대신 ERROR_MESSAGES[401] 문구가 표시되고 앱이 흰 화면 없이 동작한다",
+        "해제 버튼 높이가 48px 이상이고 모든 SDK 호출이 try/catch로 감싸여 있다"
+      ]
+    },
+    "covers": [
+      "F4 리워드 게이트",
+      "F8 AC-10",
+      "Assumption 3"
+    ],
+    "files": [
+      "src/components/RewardGate.tsx",
+      "src/components/RewardGate.test.tsx"
+    ],
+    "definition_of_done": [
+      "잠금 시 수치 DOM 미렌더 테스트 통과",
+      "401 안내 분기 확인",
+      "tsc --noEmit 통과"
+    ],
+    "depends_on": [
+      "0005"
+    ],
+    "db_schema": "AppSettings.rewardUnlockedUntil: number | null — unlockReward(now) → now + 86400000",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": "TDS whitelist: Paragraph.Text, Button, Toast, Spacing, Asset.ContentIcon + 템플릿 TossRewardAd, Card\nLayout: 잠금 시 <Card>{lockedPreview(블러 처리된 더미 바/도형, 실제 수치 문자열 없음)}</Card> + Spacing(16) + <Button variant=\"fill\" display=\"block\" size=\"large\">광고 보고 상세 리포트 열기</Button>. 해제 시 <TossRewardAd slotId={import.meta.env.VITE_TOSS_AD_SLOT_ID}> 안에서 children 렌더.\nStates: Locked=블러 미리보기 + 해제 버튼(≥48px) / Unlocked=children 그대로 / Error(500)=Toast ERROR_MESSAGES[500], 잠금 유지 / 401=해제 버튼 자리에 Paragraph.Text로 ERROR_MESSAGES[401] 안내\nInteractions: 해제 버튼 탭 → generateHapticFeedback({type:'success'}) try/catch → 광고 시청 → 성공 시 unlockReward → 상태 갱신\n주의: 블러는 커스텀 CSS filter만 허용, HEX 금지(var(--tds-color-*)), 잠금 상태에서 수치 텍스트를 opacity/visibility로만 숨기지 말 것(DOM 미렌더 필수)"
+  },
+  {
+    "id": "0012",
+    "title": "히스토리 목록 `/history` — 목록 · 필터 · 416",
+    "epic": "Epic 2: 페이지",
+    "task": {
+      "description": "기간 요약 카드, 행사별 필터 Tab(sticky), 레코드 ListRow 목록, 목록 끝 AdSlot과 '모든 기록을 다 봤어요' 종료 문구를 렌더한다. 100건 초과 시 윈도잉으로 초기 마운트를 30개 이하로 제한하고 offset을 [0, records.length]로 클램프한다. FAB는 우하단 고정.",
+      "acceptance_criteria": [
+        "data-testid='history-summary' Card가 이번 달 총액과 건수를 표시하고 Tab 헤더가 스크롤 시 sticky로 고정된다",
+        "레코드 101건 이상일 때 초기 마운트되는 ListRow DOM 노드가 30개 이하이고, 스크롤 시 offset이 0 미만 또는 records.length 초과로 넘어가지 않는다",
+        "목록 마지막까지 스크롤하면 ERROR_MESSAGES[416]('모든 기록을 다 봤어요')가 마지막 항목 아래에 정확히 1회만 표시된다",
+        "기록 0건이면 Asset.ContentIcon + '아직 기록이 없어요' + '기록 추가하기' 버튼, 필터 결과 0건이면 '{행사명} 기록이 없어요'가 표시된다",
+        "FAB가 56×56px로 우하단 고정되고 FloatingTabBar 위 16px 여백 및 safe-area 패딩이 적용되며, ListRow 탭 시 navigate('/history/'+record.id)가 실행된다"
+      ]
+    },
+    "covers": [
+      "F5 AC-7",
+      "F5 AC-11",
+      "S4 레이아웃 계약"
+    ],
+    "files": [
+      "src/pages/History.tsx"
+    ],
+    "definition_of_done": [
+      "윈도잉 30개 이하 확인",
+      "416 문구 1회 표시",
+      "빈/필터빈 상태 분기 확인",
+      "tsc --noEmit 통과"
+    ],
+    "depends_on": [
+      "0007"
+    ],
+    "db_schema": "GiftRecord[] (localStorage 'gmc:records')",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": "Pattern: 탭-루트 목록 (ScreenScaffold + sticky Tab + FloatingTabBar). SubmitFooter 금지.\nTDS whitelist: Top, Tab, ListRow, Chip, BottomSheet, AlertDialog, Toast, Button, Asset.ContentIcon, Skeleton, Spacing, Paragraph.Text + 템플릿 ScreenScaffold, Card, Amount, EmptyState, LoadingState, AdSlot, FloatingTabBar\nLayout: ScreenScaffold 골격. 목록 상단에 기간 요약 Card 1개(data-testid=\"history-summary\": 이번 달 총액·건수). Tab 헤더는 sticky(전체/결혼식/장례식/돌잔치). 목록 컨테이너 세로 스크롤. '기록 추가' FAB는 우하단 고정(56×56px), FloatingTabBar 위 16px 여백 + paddingBottom: calc(16px + env(safe-area-inset-bottom)). 목록 끝(마지막 항목 아래)에 AdSlot 1개 — 목록 중간 삽입 금지, FloatingTabBar와 겹침 금지.\nStates: Loading=Skeleton ListRow 5개 + FAB disabled / Empty=Asset.ContentIcon + '아직 기록이 없어요' + '기록 추가하기' 버튼, 필터 결과 0건 → '{행사명} 기록이 없어요' / Error(413/507)=저장 실패 Toast(errors.ts) / End of list(416)=마지막 항목 아래 '모든 기록을 다 봤어요' 1회 표시\n스크롤: 레코드 ≤100건 일반 렌더, >100건 윈도잉으로 초기 마운트 30개 이하. offset은 [0, records.length]로 클램프.\n터치: ListRow 높이 ≥56px, FAB 56×56px\nNavigation: Incoming location.state = { prefill: CalcInput & { recommendedAmount:number } } | null (prefill 있으면 BottomSheet 자동 오픈 — 시트 자체는 별도 패킷) / Outgoing ListRow 탭 → navigate('/history/'+record.id)\n주의: ListRow padding prop 없음(Spacing만), HEX 금지, 오류 문구 하드코딩 금지"
+  },
+  {
+    "id": "0013",
+    "title": "히스토리 추가·수정 BottomSheet (409 중복 확인 다이얼로그)",
+    "epic": "Epic 2: 페이지",
+    "task": {
+      "description": "기록 추가·수정용 BottomSheet 폼 컴포넌트를 만든다. 이름/금액/날짜(YYYYMMDD numeric)/행사/관계/메모를 입력받고 createRecord·updateRecord를 호출한다. 중복 409면 AlertDialog로 확인 후 force 재시도하며, 이때 시트는 열린 채 입력값을 유지한다. 저장 실패(413/507)도 시트를 유지한다.",
+      "acceptance_criteria": [
+        "src/components/RecordSheet.tsx가 { open, mode:'create'|'edit', initial, onClose, onSaved }를 받고, prefill이 주어지면 금액 필드가 recommendedAmount로 채워진 채 열린다",
+        "금액·날짜 TextField가 inputMode='numeric'이고 날짜는 8자리 YYYYMMDD 입력 후 YYYY-MM-DD로 포맷되며, 필수값 미입력 시 '저장' 버튼이 disabled다",
+        "포커스 시 시트가 키보드 높이만큼 상승해 '저장' 버튼(높이 ≥52px)이 가려지지 않는다",
+        "createRecord가 409(중복)를 반환하면 AlertDialog '같은 날짜에 같은 이름의 기록이 이미 있어요 / 그래도 새 기록으로 저장할까요?'가 뜨고 왼쪽 버튼은 '닫기', 저장 선택 시 { force:true }로 재시도해 성공한다. 닫기 선택 시 시트가 열린 채 입력값이 그대로 남는다",
+        "updateRecord가 409(동시수정)를 반환하면 ERROR_MESSAGES[409] Toast 후 시트가 닫히고 목록이 최신값으로 갱신되며, 413/507 실패 시 Toast만 뜨고 시트는 유지된다"
+      ]
+    },
+    "covers": [
+      "F5 AC-4",
+      "F5 AC-10",
+      "F5 AC-13",
+      "F1 AC-5",
+      "F1 AC-6"
+    ],
+    "files": [
+      "src/components/RecordSheet.tsx"
+    ],
+    "definition_of_done": [
+      "409 중복 다이얼로그 → force 재시도 성공 확인",
+      "저장 실패 시 시트 유지 확인",
+      "tsc --noEmit 통과"
+    ],
+    "depends_on": [
+      "0004"
+    ],
+    "db_schema": "GiftRecord { id; personName; eventType; relationship; eventDate 'YYYY-MM-DD'; amount; memo?; createdAt; updatedAt } → 'gmc:records'. 중복키 personName|eventDate|eventType, 낙관적 잠금 baseUpdatedAt",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": "TDS whitelist: BottomSheet, TextField, Chip, Button, AlertDialog, Toast, Spacing, Paragraph.Text\nLayout: BottomSheet(title='기록 추가하기' | '기록 수정하기') 안에 TextField(variant='box', label='누구에게', placeholder='예: 김서준') → Spacing(12) → TextField(variant='box', label='금액', placeholder='100000', inputMode='numeric') → Spacing(12) → TextField(variant='box', label='날짜', placeholder='20260822', inputMode='numeric', 8자리 → YYYY-MM-DD 포맷) → Spacing(16) → 행사 Chip 행(결혼식/장례식/돌잔치/기타) → Spacing(12) → 관계 Chip 행 → Spacing(12) → TextField(variant='box', label='메모', placeholder='선택 입력') → Spacing(16) → 저장 Button(variant='fill', display='block', 높이 ≥52px)\nStates: 필수값 미입력 시 저장 disabled / 저장 중 저장 버튼 loading+disabled / Conflict(409-중복)=AlertDialog '같은 날짜에 같은 이름의 기록이 이미 있어요' + '그래도 새 기록으로 저장할까요?' + [닫기 / 저장], 시트는 열린 채 입력값 유지 / Conflict(409-동시수정)=Toast ERROR_MESSAGES[409] + 시트 닫힘 + 목록 갱신 / Error(413/507)=Toast + 시트 유지\n키보드: 금액·날짜 inputMode='numeric', 포커스 시 시트가 키보드 높이만큼 상승해 저장 버튼 비가림\nInteractions: 저장 탭 → generateHapticFeedback({type:'success'}) try/catch → createRecord/updateRecord / Chip 탭 → tickWeak\n주의: AlertDialog 왼쪽 버튼은 '닫기'('취소' 금지), TextField variant+placeholder 필수, 오류 문구는 errors.ts에서만"
+  },
+  {
+    "id": "0014",
+    "title": "히스토리 상세 `/history/:id` (404 · 수정 · 삭제)",
+    "epic": "Epic 2: 페이지",
+    "task": {
+      "description": "useParams의 id로 레코드를 조회해 record-detail-card에 금액과 상세 6행을 보여준다. 없는 id면 흰 화면 대신 안내와 '목록으로' 버튼을 노출하고, 수정은 RecordSheet를 열어 처리하며 삭제는 AlertDialog 확인 후 목록으로 replace 이동한다.",
+      "acceptance_criteria": [
+        "data-testid='record-detail-card' Card 안에 금액이 t3 강조로, 이름·행사·관계·날짜·메모·기록일 6개 상세 행이 ListRow로 렌더된다",
+        ":id에 해당하는 레코드가 없으면 정확히 ERROR_MESSAGES[404]('삭제되었거나 없는 기록이에요')와 '목록으로' 버튼만 표시되고 흰 화면이 나오지 않는다",
+        "'수정하기'(SubmitFooter primary, display='block') 탭 시 RecordSheet가 edit 모드로 열리고 저장 성공 시 화면 값이 즉시 갱신된다",
+        "수정 저장 시 baseUpdatedAt 불일치면 ERROR_MESSAGES[409] Toast 후 최신값을 재조회해 표시하고, 저장 대상이 이미 삭제되었으면 ERROR_MESSAGES[404] Toast 후 navigate('/history', { replace:true })가 실행된다",
+        "'삭제' 텍스트 버튼 탭 → AlertDialog(왼쪽 버튼 '닫기') 확인 시 deleteRecord 후 navigate('/history', { replace:true })가 실행되고 모든 버튼 높이가 48px 이상이다"
+      ]
+    },
+    "covers": [
+      "S5 전체",
+      "F1 AC-11",
+      "F1 AC-12",
+      "F5 상세·삭제"
+    ],
+    "files": [
+      "src/pages/HistoryDetail.tsx"
+    ],
+    "definition_of_done": [
+      "404 안내 화면 확인",
+      "409/404 수정 분기 확인",
+      "삭제 후 replace 이동 확인",
+      "tsc --noEmit 통과"
+    ],
+    "depends_on": [
+      "0013"
+    ],
+    "db_schema": "GiftRecord (localStorage 'gmc:records') — updateRecord(id, patch, baseUpdatedAt), deleteRecord(id)",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": "Pattern: 비-탭 상세 화면 (ScreenScaffold + SubmitFooter 허용)\nTDS whitelist: Top(뒤로가기), ListRow(항목별 상세 6행), Paragraph.Text, Chip(행사·관계 배지), Button(수정/삭제), AlertDialog, BottomSheet(수정 폼=RecordSheet 재사용), Toast, Skeleton + ScreenScaffold, Card, Amount, SubmitFooter, EmptyState\nLayout: ScreenScaffold 골격. data-testid=\"record-detail-card\" Card 1개에 금액(t3 강조, Amount) + 상세 행 6개(ListRow). 배지는 Chip(행사·관계). 하단 SubmitFooter에 '수정하기'(primary, display='block'), '삭제'는 텍스트 버튼(Card 아래 또는 본문 하단).\nStates: Loading=Skeleton 카드 1개 / Empty·Error(404)=ERROR_MESSAGES[404] + '목록으로' 버튼(흰 화면 금지) / Conflict(409)=Toast ERROR_MESSAGES[409] 후 최신값 재조회 / 404 during edit=수정 시트 열린 상태에서 대상이 삭제되면 저장 시 Toast ERROR_MESSAGES[404] + navigate('/history',{replace:true})\n터치: 모든 버튼 높이 ≥48px. 광고 없음.\nNavigation: Incoming useParams<{id:string}>()만 사용, location.state 미사용 / Outgoing 삭제 확정 후 navigate('/history', { replace:true })\n주의: AlertDialog 왼쪽 버튼 '닫기', ListRow padding prop 없음, HEX 금지, 문구는 errors.ts에서만"
+  },
+  {
+    "id": "0015",
+    "title": "통계 `/stats` — 요약 영역",
+    "epic": "Epic 2: 페이지",
+    "task": {
+      "description": "aggregate 결과로 SummaryHero(총 지출 CountUp)와 stat-card 2개(요약 지표 3종 / 행사 유형 비중 MiniBar)를 렌더한다. 기록 0건이면 EmptyState로 기록 추가 유도하고, subscribeRecords로 다른 탭 변경 시 집계가 자동 재계산된다. 요약 카드와 상세 섹션 사이에 AdSlot 1개를 둔다.",
+      "acceptance_criteria": [
+        "최상단 SummaryHero가 총 지출을 CountUp으로 표시하고 data-testid='stat-card' 요소가 2개 이상 렌더된다",
+        "기록 0건이면 Asset.ContentIcon + '기록이 없어 통계를 만들 수 없어요' + '기록 추가하러 가기' 버튼이 표시되고, 버튼 탭 시 navigate('/history', { state: { prefill: null } })가 실행된다",
+        "다른 탭에서 기록이 변경되면 subscribeRecords 콜백으로 집계가 재계산되어 화면 총액이 갱신된다",
+        "로딩 중 Hero Skeleton 1개와 카드 Skeleton 2개가 렌더되고, VITE_TOSS_AD_GROUP_ID가 빈 값이면 AdSlot이 아무것도 렌더하지 않는다",
+        "탭-루트 화면이므로 SubmitFooter를 사용하지 않고 FloatingTabBar와 겹치는 고정 요소가 없다"
+      ]
+    },
+    "covers": [
+      "S6 요약 영역",
+      "F6 요약",
+      "F1 AC-13"
+    ],
+    "files": [
+      "src/pages/Stats.tsx"
+    ],
+    "definition_of_done": [
+      "stat-card 2개 이상 확인",
+      "빈 상태 CTA 이동 확인",
+      "구독 재계산 확인",
+      "tsc --noEmit 통과"
+    ],
+    "depends_on": [
+      "0007"
+    ],
+    "db_schema": "StatsSummary (aggregate(records, now) 결과) — 저장 없음, 파생 계산",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": "Pattern: 탭-루트 통계 (ScreenScaffold + SummaryHero + FloatingTabBar). SubmitFooter 금지.\nTDS whitelist: Top(타이틀 '통계'), Paragraph.Text, Chip, Button, Skeleton, Asset.ContentIcon, Toast, Spacing + 템플릿 ScreenScaffold, SummaryHero, CountUp, Amount, Card, MiniBar, EmptyState, LoadingState, AdSlot, FloatingTabBar\nLayout: ScreenScaffold 골격. 최상단 SummaryHero(총 지출, CountUp) 1개. data-testid=\"stat-card\" Card 2개 이상 — ①요약 지표 3종(총 건수/평균 금액/최다 관계) ②행사 유형 비중 MiniBar. 요약 카드와 상세 통계 섹션 사이에 AdSlot 1개. 상세 시각화(trend-sparkline, detail-stats)는 별도 패킷이 이 화면에 얹는다.\nStates: Loading=Hero Skeleton 1개 + 카드 Skeleton 2개 / Empty=0건 → Asset.ContentIcon + '기록이 없어 통계를 만들 수 없어요' + '기록 추가하러 가기' / Error(500)=Toast(errors.ts) / 동기화=subscribeRecords로 집계 재계산\n터치: 버튼 높이 ≥48px\nNavigation: Incoming 없음 / Outgoing '기록 추가하러 가기' → navigate('/history', { state:{ prefill:null } })\n주의: HEX 금지(var(--tds-color-*)), 금액은 Amount·CountUp, 이모지 금지(Asset.ContentIcon 사용)"
+  },
+  {
+    "id": "0016",
+    "title": "통계 상세 시각화 + 리워드 게이트 + 401",
+    "epic": "Epic 2: 페이지",
+    "task": {
+      "description": "월별 추이 Sparkline과 상세 지표 섹션을 컴포넌트로 만들고 RewardGate로 감싸 리워드 시청 후에만 수치가 DOM에 렌더되게 한다. 토스 앱 밖에서는 401 안내 문구로 대체한다. Stats 화면에서 import해 상세 섹션 자리에 배치한다.",
+      "acceptance_criteria": [
+        "src/components/StatsDetail.tsx가 data-testid='trend-sparkline' Sparkline 1개와 data-testid='detail-stats' 상세 섹션을 렌더한다",
+        "잠금 상태에서는 블러 미리보기만 보이고 detail-stats 내부 수치 텍스트가 DOM에 존재하지 않는다",
+        "리워드 시청 성공 후 24시간 동안 재진입해도 잠금이 풀린 상태로 detail-stats가 즉시 렌더된다",
+        "광고 실패 시 ERROR_MESSAGES[500] Toast가 뜨고 잠금이 유지되며, 토스 앱 밖에서는 해제 버튼 대신 ERROR_MESSAGES[401] 문구가 표시된다",
+        "monthlyTrend가 1개월치뿐이어도 Sparkline이 throw 없이 렌더되고 레이아웃이 깨지지 않는다"
+      ]
+    },
+    "covers": [
+      "S6 상세·Locked·401",
+      "F6 상세 시각화",
+      "F8 AC-10"
+    ],
+    "files": [
+      "src/components/StatsDetail.tsx"
+    ],
+    "definition_of_done": [
+      "잠금 시 수치 DOM 미렌더 확인",
+      "401 분기 확인",
+      "1개월 데이터 렌더 확인",
+      "tsc --noEmit 통과"
+    ],
+    "depends_on": [
+      "0011",
+      "0007"
+    ],
+    "db_schema": "StatsSummary.monthlyTrend: { month: 'YYYY-MM'; amount: number }[]",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": "TDS whitelist: Paragraph.Text, Chip, Button, Skeleton, Toast, Spacing + 템플릿 Card, Sparkline, MiniBar, Amount, RewardGate(TossRewardAd 래퍼)\nLayout: <RewardGate lockedPreview={블러 처리된 더미 라인+바(수치 텍스트 없음)}> 안에 ①Paragraph.Text(t4) '월별 추이' + Sparkline(data-testid=\"trend-sparkline\") ②Card(data-testid=\"detail-stats\")에 상세 지표 행들(최대 지출 월, 행사 유형별 평균, 관계별 합계) </RewardGate>\nStates: Locked=블러 미리보기 + '광고 보고 상세 리포트 열기' 버튼(≥48px), 수치 텍스트 DOM 미렌더 / Unlocked=전체 렌더 / Error(500)=Toast ERROR_MESSAGES[500], 잠금 유지 / 401=해제 버튼 대신 ERROR_MESSAGES[401] 문구\nInteractions: 해제 버튼 → generateHapticFeedback({type:'success'}) try/catch → 광고 시청 → unlockReward\n주의: Sparkline 데이터 1개일 때도 안전, HEX 금지, 이모지 금지, 문구는 errors.ts 단일 소스"
+  },
+  {
+    "id": "0017",
+    "title": "공유 카드 `/share`",
+    "epic": "Epic 2: 페이지",
+    "task": {
+      "description": "3:4 비율 카드에 행사·관계 배지, 권장 금액, 권장 범위, 참고용 캡션을 순서대로 렌더하고 SubmitFooter의 '결과 복사하기'로 클립보드에 텍스트를 복사한다. location.state가 없으면 /로 replace 리다이렉트하며, 캡처 영역 오염 방지를 위해 광고를 넣지 않는다.",
+      "acceptance_criteria": [
+        "data-testid='share-card' Card가 3:4 비율 컨테이너로 렌더되고 내부 순서가 배지 → 권장 금액(t2 이상) → 권장 범위 → '참고용 권장 금액이에요' 캡션이다",
+        "location.state === null이면 렌더 대신 navigate('/', { replace: true })가 실행된다",
+        "'결과 복사하기' 탭 시 navigator.clipboard.writeText가 try/catch로 호출되고 성공 시 완료 Toast가 뜬다",
+        "복사 실패 시 ERROR_MESSAGES[500] 계열 복사 실패 문구('복사에 실패했어요. 화면을 캡처해 공유해주세요')가 Toast로 표시된다",
+        "복사 버튼 높이가 52px 이상, 뒤로가기 터치 영역이 44px 이상이고 화면 어디에도 AdSlot이 렌더되지 않는다"
+      ]
+    },
+    "covers": [
+      "S7 전체",
+      "F7 카드 렌더·복사"
+    ],
+    "files": [
+      "src/pages/Share.tsx"
+    ],
+    "definition_of_done": [
+      "share-card testId 존재",
+      "state null 리다이렉트 확인",
+      "복사 성공/실패 Toast 확인",
+      "tsc --noEmit 통과"
+    ],
+    "depends_on": [
+      "0002",
+      "0001"
+    ],
+    "db_schema": "",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": "Pattern: 비-탭 화면 (ScreenScaffold + SubmitFooter 허용)\nTDS whitelist: Top(뒤로가기), Paragraph.Text, Chip(행사·관계 배지), Button(SubmitFooter '결과 복사하기'), Toast, Skeleton, Spacing + ScreenScaffold, Card, Amount, SubmitFooter\nLayout: ScreenScaffold 골격. data-testid=\"share-card\" Card 1개(3:4 비율 컨테이너, 커스텀 CSS flex 허용) 안에 배지(Chip 행사·관계) → 권장 금액(Amount, t2 이상) → 권장 범위 → '참고용 권장 금액이에요' 캡션 순서. 하단 SubmitFooter label='결과 복사하기'.\nStates: Loading=카드 자리 Skeleton 1개 / Empty·Error(404 등가)=location.state === null → navigate('/', { replace:true }) / Error(500)=복사 실패 Toast '복사에 실패했어요. 화면을 캡처해 공유해주세요'(errors.ts 소스)\n터치: 복사 버튼 ≥52px, 뒤로가기 ≥44px. 광고 없음(캡처 영역 오염 방지).\nNavigation: Incoming location.state = { input: CalcInput, result: CalcResult } / Outgoing 뒤로가기 → navigate(-1)\n주의: SubmitFooter 안에 Button 금지(label만 전달), clipboard 호출 try/catch, HEX 금지"
+  },
+  {
+    "id": "0018",
+    "title": "설정 `/settings` (확인 후 반영 · 전체 삭제)",
+    "epic": "Epic 2: 페이지",
+    "task": {
+      "description": "계산 기준(기본 지역 BottomSheet, 물가 보정 Switch)과 데이터 관리(앱 버전, 모든 기록 삭제) ListRow 그룹 2개를 만든다. 저장은 낙관적 업데이트 없이 확인 후 반영이며, 진행 중에는 해당 컨트롤이 disabled가 되고 실패 시 UI가 이전 값을 유지한다.",
+      "acceptance_criteria": [
+        "ListRow 그룹 2개(계산 기준 / 데이터 관리)가 섹션 헤더로 구분되고 각 ListRow 높이가 56px 이상, Switch 터치 영역이 44×44px 이상이다",
+        "'기본 지역' ListRow 탭 시 BottomSheet가 열리고 선택 후 saveSettings 성공 시에만 bottom 텍스트가 새 지역으로 바뀐다",
+        "saveSettings 실패 시 Toast가 뜨고 Switch/ListRow 값이 변경 전 값 그대로 유지된다(낙관적 반영 없음)",
+        "저장 요청 진행 중 해당 Switch/ListRow가 disabled여서 연속 탭으로 중복 요청이 발생하지 않는다",
+        "기록 0건이면 '모든 기록 삭제' ListRow가 disabled이고, 1건 이상이면 AlertDialog(왼쪽 버튼 '닫기') 확인 후 clearAll이 실행되어 목록이 0건이 된다"
+      ]
+    },
+    "covers": [
+      "S8 전체",
+      "F8 AC-5",
+      "F8 AC-12",
+      "F8 데이터 관리"
+    ],
+    "files": [
+      "src/pages/Settings.tsx"
+    ],
+    "definition_of_done": [
+      "확인 후 반영 패턴 확인",
+      "저장 중 disabled 확인",
+      "전체 삭제 동작 확인",
+      "tsc --noEmit 통과"
+    ],
+    "depends_on": [
+      "0007"
+    ],
+    "db_schema": "AppSettings { defaultRegion; inflationAdjustDefault; rewardUnlockedUntil } → 'gmc:settings' / clearAll()은 'gmc:records', 'gmc:settings' 제거",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": "Pattern: 탭-루트 설정 (ScreenScaffold + FloatingTabBar). SubmitFooter 금지.\nTDS whitelist: Top(타이틀 '설정'), ListRow(기본 지역/앱 버전/모든 기록 삭제), Switch(물가 보정 기본값), BottomSheet(지역 선택), AlertDialog(삭제 확인), Toast, Skeleton, Spacing, Paragraph.Text + ScreenScaffold, Card, FloatingTabBar\nLayout: ScreenScaffold 골격. ListRow 그룹 2개를 섹션 헤더(Paragraph.Text t4 '계산 기준' / '데이터 관리')로 구분. ①계산 기준: 기본 지역 ListRow(2RowTypeA, bottom=지역명, onClick=BottomSheet), 물가 보정 ListRow(right=<Switch/>) ②데이터 관리: 앱 버전 ListRow, 모든 기록 삭제 ListRow(강조 텍스트). ListRow에 padding prop 없음 — 간격은 Spacing으로만.\nStates: Loading=Skeleton ListRow 3개 / Empty=기록 0건이면 '모든 기록 삭제' ListRow disabled / Error(500/507)=설정 저장 실패 Toast(errors.ts) + 확인 후 반영 패턴으로 UI가 이전 값 유지 / Saving=저장 진행 중 해당 Switch/ListRow disabled(중복 요청 방지)\n터치: ListRow 높이 ≥56px, Switch 터치 영역 ≥44×44px. 광고 없음.\nInteractions: Switch/Chip 토글 → tickWeak(try/catch), 삭제 확정 → generateHapticFeedback({type:'success'})\n주의: AlertDialog 왼쪽 버튼 '닫기', 낙관적 UI 업데이트 금지, HEX 금지"
+  },
+  {
+    "id": "0019",
+    "title": "라우팅 + FloatingTabBar + 오버레이 수명주기 배선 (App.tsx 단독 소유)",
+    "epic": "4",
+    "task": {
+      "description": "App.tsx에서 react-router-dom 라우트 8개를 연결하고 탭-루트 4화면에 FloatingTabBar를 배선한다. 전역 Provider(광고/토스 SDK 컨텍스트)도 이 패킷이 함께 배선한다. 라우트 변경·뒤로가기 시 열린 BottomSheet/AlertDialog가 전부 닫히고 body 스크롤 잠금이 해제되도록 오버레이 수명주기를 관리한다. main.tsx는 수정하지 않는다.",
+      "acceptance_criteria": [
+        "src/App.tsx가 '/', '/calc', '/result', '/history', '/history/:id', '/stats', '/share', '/settings' 8개 라우트를 정의하고 정의되지 않은 경로는 '/'로 replace 리다이렉트한다",
+        "FloatingTabBar가 '/', '/history', '/stats', '/settings' 4개 탭-루트에서만 렌더되고 활성 탭에 컬러 틴트가 적용되며, 비-탭 화면에서는 렌더되지 않는다",
+        "라우트 이동 또는 하드웨어 뒤로가기 시 열려 있던 BottomSheet/AlertDialog가 모두 닫히고 입력값이 폐기되며 document.body의 overflow 잠금이 해제된다",
+        "앱을 빌드해 실행하면 8개 경로 모두 흰 화면 없이 렌더되고 콘솔 에러 0건이다",
+        "src/main.tsx는 변경되지 않고(@AI:ANCHOR 보존) npm run build가 종료 코드 0으로 성공한다"
+      ]
+    },
+    "covers": [
+      "F5 AC-12",
+      "AC-G 라우팅",
+      "S1~S8 라우트 연결"
+    ],
+    "files": [
+      "src/App.tsx",
+      "src/hooks/useOverlayLifecycle.ts"
+    ],
+    "definition_of_done": [
+      "8개 라우트 전부 렌더 확인",
+      "탭바 4탭만 노출",
+      "오버레이 자동 닫힘 확인",
+      "npm run build 성공"
+    ],
+    "depends_on": [
+      "0008",
+      "0009",
+      "0010",
+      "0012",
+      "0014",
+      "0015",
+      "0017",
+      "0018"
+    ],
+    "db_schema": "",
+    "api_contract": "",
+    "dependencies": [
+      "react-router-dom"
+    ],
+    "ui_requirements": "react-router-dom BrowserRouter/Routes/Route 사용. 탭-루트 4화면('/', '/history', '/stats', '/settings')에만 FloatingTabBar(템플릿 제공, 4탭: 홈/기록/통계/설정, 활성탭 컬러 틴트) 렌더. 비-탭 화면('/calc','/result','/history/:id','/share')은 SubmitFooter 사용이므로 탭바 미렌더. 하단 고정 요소에 paddingBottom: calc(Npx + env(safe-area-inset-bottom)) 적용. 알 수 없는 경로는 <Navigate to='/' replace />. useOverlayLifecycle 훅은 useLocation 변화 시 등록된 오버레이 close 콜백을 전부 실행하고 body overflow 잠금을 해제한다. main.tsx 수정 금지(@AI:ANCHOR)."
+  },
+  {
+    "id": "0020",
+    "title": "광고 env 안전 가드 + 정책·격리 정적 검증 스크립트",
+    "epic": "Epic 3: 통합",
+    "task": {
+      "description": "광고 컴포넌트가 env 미설정 시 아무것도 렌더하지 않고 레이아웃을 유지하도록 가드 훅을 만들고, 토스 검수 정책(403 스토리지 격리, CORS 0건, 프로모션·IAP 미사용, 외부 SDK 금지, TDS 단독 사용)을 정적으로 검증하는 CI 스크립트를 작성한다. App.tsx·main.tsx는 건드리지 않는다.",
+      "acceptance_criteria": [
+        "src/hooks/useAdConfig.ts가 { bannerId, rewardSlotId, adsEnabled }를 반환하고 env가 빈 문자열이면 adsEnabled=false이며 이때 AdSlot/TossRewardAd 자리에 높이 0인 노드만 남아 주변 레이아웃 위치가 변하지 않는다",
+        "node scripts/check-policy.mjs가 (a) localStorage 접근이 src/lib/storage.ts 외 0건 (b) 'gmc:' 외 키 문자열 0건 (c) grantPromotionReward 호출 0건 (d) TossPurchase/IAP 사용 0건을 확인하고 종료 코드 0을 반환한다",
+        "같은 스크립트가 외부 SDK 금지 목록(stripe, iamport, bootpay, @tosspayments, kakao, naver, firebase/auth, next-auth, @react-oauth, admob, adsense)과 금지 UI 라이브러리(@mui, antd, @chakra-ui, shadcn)의 import 0건을 검증한다",
+        "fetch/XMLHttpRequest로 외부 도메인을 호출하는 코드가 0건임을 스크립트가 확인한다(CORS 에러 0건 보장)",
+        "npm run build와 전체 테스트가 통과하고 check-policy.mjs, check-error-source.mjs 두 스크립트가 모두 종료 코드 0이다"
+      ]
+    },
+    "covers": [
+      "F8 AC-8",
+      "F8 AC-9",
+      "F8 AC-11",
+      "Assumption 6",
+      "Assumption 7",
+      "Assumption 8"
+    ],
+    "files": [
+      "src/hooks/useAdConfig.ts",
+      "scripts/check-policy.mjs",
+      "src/hooks/useAdConfig.test.ts"
+    ],
+    "definition_of_done": [
+      "env 빈값에서 레이아웃 무너짐 없음 확인",
+      "check-policy.mjs 종료 코드 0",
+      "전체 테스트·빌드 통과"
+    ],
+    "depends_on": [
+      "0019"
+    ],
+    "db_schema": "",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": "광고 배치 확정: 홈=최근 기록 아래 AdSlot 1개, 히스토리 목록=목록 끝(마지막 항목 아래) AdSlot 1개(중간 삽입 금지, FloatingTabBar 겹침 금지), 통계=요약 카드와 상세 섹션 사이 AdSlot 1개, 결과/상세/공유/설정=광고 없음. 리워드는 TossRewardAd가 결과 상세·통계 detail-stats를 게이트. env 미설정 시 광고 컴포넌트는 null 반환(레이아웃 높이 변화 0). 모든 SDK 호출 try/catch. HEX 하드코딩 금지, TDS 컴포넌트 외 UI 라이브러리 사용 금지."
+  }
+]
