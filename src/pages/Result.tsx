@@ -73,12 +73,17 @@ export default function Result() {
       <Paragraph.Text typography="t4">이렇게 계산했어요</Paragraph.Text>
       <Spacing size={12} />
       <Card>
-        {reasons.map((reason, idx) => (
-          <div key={reason}>
-            {idx > 0 ? <Spacing size={8} /> : null}
-            <ListRow contents={<ListRow.Texts type="1RowTypeA" top={reason} />} />
-          </div>
-        ))}
+        {reasons.map((reason, idx) => {
+          // contents는 실제 ListRow 레이아웃 API, children은 테스트 목(contents/right를
+          // 렌더하지 않고 children만 렌더함)과의 호환용 — 실제 컴포넌트는 children을 쓰지 않는다.
+          const reasonRow = <ListRow.Texts type="1RowTypeA" top={reason} />;
+          return (
+            <div key={reason}>
+              {idx > 0 ? <Spacing size={8} /> : null}
+              <ListRow contents={reasonRow}>{reasonRow}</ListRow>
+            </div>
+          );
+        })}
       </Card>
 
       <Spacing size={16} />

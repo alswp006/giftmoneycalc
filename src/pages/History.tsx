@@ -1,24 +1,19 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Top, Tab, ListRow, Button, Asset, Paragraph } from '@toss/tds-mobile';
+import { Top, Tab, ListRow, Button, Paragraph } from '@toss/tds-mobile';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { generateHapticFeedback } from '@apps-in-toss/web-framework';
 import { ScreenScaffold } from '@/components/ScreenScaffold';
 import { Card } from '@/components/Card';
 import { Amount } from '@/components/Amount';
-import { EmptyState, LoadingState } from '@/components/StateView';
+import { EmptyState, EmptyIcon, LoadingState } from '@/components/StateView';
 import { AdSlot } from '@/components/AdSlot';
 import { FloatingTabBar } from '@/components/FloatingTabBar';
 import { RecordSheet, type RecordSheetInitial } from '@/components/RecordSheet';
 import { useRecords } from '@/hooks/useRecords';
 import { ERROR_MESSAGES } from '@/lib/errors';
 import { EVENT_TYPE_LABEL } from '@/lib/rules';
+import { NAV_TABS } from '@/lib/nav';
 import type { EventType, RouteState } from '@/lib/types';
-
-const NAV_TABS = [
-  { label: '홈', path: '/' },
-  { label: '기록', path: '/history' },
-  { label: '설정', path: '/settings' },
-];
 
 const FILTER_TABS: Array<{ label: string; value: EventType | null }> = [
   { label: '전체', value: null },
@@ -118,39 +113,48 @@ export default function History() {
       bottom={<FloatingTabBar items={NAV_TABS} />}
     >
       <Card testId="history-summary">
-        <Paragraph.Text typography="st11">이번 달 경조사비</Paragraph.Text>
-        <Amount value={monthTotal} unit="원" typography="t2" />
-        <Paragraph.Text typography="t6">{monthCount}건 기록했어요</Paragraph.Text>
+        {/* Paragraph.Text·Amount는 인라인 요소라 그대로 두면 한 줄에 붙어 렌더된다 → 세로 스택. */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
+          <Paragraph.Text typography="st11">이번 달 경조사비</Paragraph.Text>
+          <Amount value={monthTotal} unit="원" typography="t2" />
+          <Paragraph.Text typography="t6">{monthCount}건 기록했어요</Paragraph.Text>
+        </div>
       </Card>
 
       <div style={{ height: 12 }} />
 
-      <div
-        data-testid="history-tab-sticky"
-        style={{
-          position: 'sticky',
-          top: 0,
-          zIndex: 1,
-          backgroundColor: 'var(--adaptiveBackground)',
-        }}
-      >
-        <Tab onChange={(i) => setActiveTab(i)}>
-          {FILTER_TABS.map((tab, i) => (
-            <Tab.Item key={tab.label} selected={activeTab === i} onClick={() => setActiveTab(i)}>
-              {tab.label}
-            </Tab.Item>
-          ))}
-        </Tab>
-      </div>
+      {/* 기록이 하나도 없으면 행사별 필터를 감춘다 — 고를 게 없는 탭 줄은 자리만 차지하고,
+          하단 탭바와 나란히 두 개의 tablist가 겹쳐 보이는 것도 막는다. */}
+      {records.length > 0 ? (
+        <>
+          <div
+            data-testid="history-tab-sticky"
+            style={{
+              position: 'sticky',
+              top: 0,
+              zIndex: 1,
+              backgroundColor: 'var(--adaptiveBackground)',
+            }}
+          >
+            <Tab onChange={(i) => setActiveTab(i)}>
+              {FILTER_TABS.map((tab, i) => (
+                <Tab.Item key={tab.label} selected={activeTab === i} onClick={() => setActiveTab(i)}>
+                  {tab.label}
+                </Tab.Item>
+              ))}
+            </Tab>
+          </div>
 
-      <div style={{ height: 12 }} />
+          <div style={{ height: 12 }} />
+        </>
+      ) : null}
 
       {loading ? (
         <LoadingState rows={5} testId="history-loading" />
       ) : records.length === 0 ? (
         <EmptyState
           testId="history-empty"
-          icon={<Asset.ContentIcon name="iconEmptyBoxRegular" alt="기록 없음" style={{ width: 48, height: 48 }} />}
+          icon={<EmptyIcon label="기록 없음" />}
           title="아직 기록이 없어요"
           description="첫 경조사비 기록을 남겨보세요"
           action={

@@ -2,6 +2,34 @@ import type { ReactNode } from "react";
 import { Paragraph, Spacing, Skeleton } from "@toss/tds-mobile";
 
 /**
+ * 빈 상태용 아이콘.
+ *
+ * @AI:NOTE Asset.ContentIcon(name=...)은 이름을 토스 CDN 경로로 바꿔 불러온다 — 존재하지 않는
+ * 이름을 주면 403 + "Wrong URL" throw로 트리가 언마운트되고 콘솔 에러가 남는다(검수 반려).
+ * 검증된 이름 목록이 없으므로 네트워크가 필요 없는 인라인 SVG를 쓴다(색은 adaptive 변수).
+ */
+export function EmptyIcon({ label = "내용 없음", size = 48 }: { label?: string; size?: number }) {
+  return (
+    <svg
+      role="img"
+      aria-label={label}
+      width={size}
+      height={size}
+      viewBox="0 0 48 48"
+      fill="none"
+      stroke="var(--adaptiveGrey400)"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M8 18h32v20a4 4 0 0 1-4 4H12a4 4 0 0 1-4-4V18Z" />
+      <path d="M6 18l4-8h28l4 8" />
+      <path d="M20 26h8" />
+    </svg>
+  );
+}
+
+/**
  * 빈 상태 — 아이콘(선택) + 제목 + 설명 + 보조(weak) CTA.
  *
  * Pre-built (재구현 금지): 목록/결과가 비었을 때 맨텍스트("데이터 없음") 대신 사용.

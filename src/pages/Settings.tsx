@@ -8,17 +8,12 @@ import { getSettings, saveSettings } from '@/lib/settings';
 import { clearAll } from '@/lib/storage';
 import { getErrorMessage } from '@/lib/errors';
 import { REGION_LABEL } from '@/lib/rules';
+import { NAV_TABS } from '@/lib/nav';
 import type { AppSettings, Region } from '@/lib/types';
 
 const APP_VERSION = '1.0.0';
 const ROW_MIN_HEIGHT = '56px';
 const REGIONS = Object.keys(REGION_LABEL) as Region[];
-
-const TABS = [
-  { label: '홈', path: '/' },
-  { label: '기록', path: '/history' },
-  { label: '설정', path: '/settings' },
-];
 
 function safeHaptic(type: 'success' | 'tickWeak') {
   try {
@@ -112,7 +107,7 @@ export default function Settings() {
   return (
     <ScreenScaffold
       top={<Top title={<Top.TitleParagraph>설정</Top.TitleParagraph>} />}
-      bottom={<FloatingTabBar items={TABS} />}
+      bottom={<FloatingTabBar items={NAV_TABS} />}
     >
       <div data-testid="settings-calc-group">
         <Paragraph.Text typography="t4">계산 기준</Paragraph.Text>

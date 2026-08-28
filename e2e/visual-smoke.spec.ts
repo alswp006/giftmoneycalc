@@ -10,12 +10,14 @@ import { test, expect, type Page } from "@playwright/test";
  *   1) ROUTES에 핵심 화면을 추가(폼/결과/목록/설정 등)
  *   2) 데이터가 필요한 화면은 seed()에서 localStorage를 채워라
  */
+// /result·/share는 이전 화면에서 넘긴 location.state가 있어야 렌더된다(직접 진입 시 홈으로
+// replace 리다이렉트) — 직접 열면 홈 스크린샷이 중복될 뿐이라 넣지 않는다.
 const ROUTES: { path: string; name: string }[] = [
   { path: "/", name: "home" },
+  { path: "/calc", name: "calc" },
   { path: "/history", name: "history" },
   { path: "/stats", name: "stats" },
-  // { path: "/result", name: "result" },   // ← 이 앱의 라우트를 추가
-  // { path: "/settings", name: "settings" },
+  { path: "/settings", name: "settings" },
 ];
 
 /** 데이터가 필요한 화면용 localStorage 시드(앱에 맞게 채워라). 앱 스크립트보다 먼저 실행된다. */

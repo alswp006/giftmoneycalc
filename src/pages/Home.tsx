@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Top, Paragraph, Spacing, ListRow, Button, Chip, Toast } from '@toss/tds-mobile';
+import { Top, Paragraph, Spacing, ListRow, Button, Toast } from '@toss/tds-mobile';
 import { useNavigate } from 'react-router-dom';
 import { generateHapticFeedback } from '@apps-in-toss/web-framework';
 import { ScreenScaffold } from '@/components/ScreenScaffold';
@@ -11,17 +11,12 @@ import { EmptyState, LoadingState } from '@/components/StateView';
 import { AdSlot } from '@/components/AdSlot';
 import { FloatingTabBar } from '@/components/FloatingTabBar';
 import { useRecords } from '@/hooks/useRecords';
+import { NAV_TABS } from '@/lib/nav';
 import { getErrorMessage } from '@/lib/errors';
 import { EVENT_TYPE_LABEL } from '@/lib/rules';
 import type { EventType, GiftRecord, RouteState } from '@/lib/types';
 
 const QUICK_EVENTS: EventType[] = ['wedding', 'funeral', 'firstBirthday'];
-
-const TABS = [
-  { label: '홈', path: '/' },
-  { label: '기록', path: '/history' },
-  { label: '설정', path: '/settings' },
-];
 
 function currentMonthKey(now = new Date()): string {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -74,7 +69,7 @@ export default function Home() {
   return (
     <ScreenScaffold
       top={<Top title={<Top.TitleParagraph>경조사비 계산기</Top.TitleParagraph>} />}
-      bottom={<FloatingTabBar items={TABS} />}
+      bottom={<FloatingTabBar items={NAV_TABS} />}
     >
       <SummaryHero
         label="이번 달 경조사비"
@@ -93,11 +88,19 @@ export default function Home() {
 
       <Paragraph.Text typography="t4">바로 계산</Paragraph.Text>
       <Spacing size={12} />
-      <div style={{ display: 'flex', gap: 8, overflowX: 'auto' }}>
+      {/* TDS Chip은 칩 '그룹 컨테이너'(div)라 안에 라벨을 직접 넣으면 알약 없이 맨 텍스트로
+          렌더된다 — 선택형 알약은 weak Button으로 만든다. */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         {QUICK_EVENTS.map((type) => (
-          <Chip key={type} variant="weak" onClick={() => goCalcWithEvent(type)}>
+          <Button
+            key={type}
+            variant="weak"
+            size="small"
+            display="inline"
+            onClick={() => goCalcWithEvent(type)}
+          >
             {EVENT_TYPE_LABEL[type]}
-          </Chip>
+          </Button>
         ))}
       </div>
 

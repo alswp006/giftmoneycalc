@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Top, Paragraph, Spacing, Button, Asset, Skeleton } from '@toss/tds-mobile';
+import { Top, Paragraph, Spacing, Button, Skeleton } from '@toss/tds-mobile';
 import { useNavigate } from 'react-router-dom';
 import { ScreenScaffold } from '@/components/ScreenScaffold';
 import { SummaryHero } from '@/components/SummaryHero';
@@ -7,19 +7,14 @@ import { CountUp } from '@/components/CountUp';
 import { Amount } from '@/components/Amount';
 import { Card } from '@/components/Card';
 import { MiniBar } from '@/components/MiniBar';
-import { EmptyState } from '@/components/StateView';
+import { EmptyState, EmptyIcon } from '@/components/StateView';
 import { AdSlot } from '@/components/AdSlot';
 import { FloatingTabBar } from '@/components/FloatingTabBar';
 import { useRecords } from '@/hooks/useRecords';
 import { aggregate } from '@/lib/stats';
+import { NAV_TABS } from '@/lib/nav';
 import { EVENT_TYPE_LABEL, RELATIONSHIP_LABEL } from '@/lib/rules';
 import type { RouteState } from '@/lib/types';
-
-const NAV_TABS = [
-  { label: '홈', path: '/' },
-  { label: '기록', path: '/history' },
-  { label: '설정', path: '/settings' },
-];
 
 export default function Stats() {
   const navigate = useNavigate();
@@ -61,9 +56,7 @@ export default function Stats() {
       ) : records.length === 0 ? (
         <EmptyState
           testId="stats-empty"
-          icon={
-            <Asset.ContentIcon name="iconEmptyBoxRegular" alt="기록 없음" style={{ width: 48, height: 48 }} />
-          }
+          icon={<EmptyIcon label="기록 없음" />}
           title="기록이 없어 통계를 만들 수 없어요"
           description="첫 경조사비 기록을 남기면 통계가 만들어져요"
           action={
