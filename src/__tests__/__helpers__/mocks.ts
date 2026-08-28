@@ -140,6 +140,11 @@ export function mockTds() {
     BottomCTA: ({ children }: any) =>
       React.createElement("div", { "data-slot": "bottom-cta" }, children),
 
+    // FixedBottomCTA is itself a <button> (see src/components/BottomCTA.tsx SubmitFooter) —
+    // mocked as a plain button so onClick/disabled behave like the real component.
+    FixedBottomCTA: ({ children, onClick, disabled }: any) =>
+      React.createElement("button", { onClick, disabled }, children),
+
     BottomSheet: Object.assign(
       ({ children, open }: any) =>
         open ? React.createElement("div", { role: "dialog" }, children) : null,

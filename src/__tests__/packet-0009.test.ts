@@ -25,8 +25,10 @@ mockAppsInToss();
 mockTossRewardAd();
 
 const mockNavigate = vi.fn();
+(globalThis as any).__DEBUG_mockNavigate = mockNavigate;
 vi.mock("react-router-dom", async () => {
   const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
+  console.log("DEBUG factory invoked", Object.keys(actual));
   return { ...actual, useNavigate: () => mockNavigate };
 });
 
