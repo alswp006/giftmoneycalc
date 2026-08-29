@@ -29,8 +29,11 @@ function createProxyModuleMock() {
     Comp.displayName = name;
     return new Proxy(Comp, {
       get(target, prop) {
-        if (prop in target) return (target as any)[prop];
-        return makeComponent(`${name}.${String(prop)}`);
+        if (typeof prop !== "string" || prop in target) return (target as any)[prop];
+        // 대문자로 시작하는 프로퍼티만 하위 컴포넌트로 만든다.
+        // prototype/then까지 컴포넌트로 돌려주면 React가 클래스로 오인하거나 await가 멈춘다.
+        if (!/^[A-Z]/.test(prop)) return undefined;
+        return makeComponent(`${name}.${prop}`);
       },
     });
   };
@@ -39,7 +42,12 @@ function createProxyModuleMock() {
     {
       get(_target, prop) {
         if (prop === "__esModule") return true;
+        if (prop === "then") return undefined;
         return makeComponent(String(prop));
+      },
+      // vitest는 mock에 실제로 존재하는 export만 허용하므로 `in`에 항상 true를 준다.
+      has(_target, prop) {
+        return prop !== "then";
       },
     }
   );
@@ -49,7 +57,10 @@ vi.mock("@toss/tds-mobile", () => createProxyModuleMock());
 vi.mock("@toss/tds-mobile-ait", () => createProxyModuleMock());
 vi.mock("@toss/tds-colors", () => createProxyModuleMock());
 vi.mock("lucide-react", () => createProxyModuleMock());
-vi.mock("@apps-in-toss/web-framework", () => new Proxy({}, { get: () => vi.fn() }));
+vi.mock(
+  "@apps-in-toss/web-framework",
+  () => new Proxy({}, { get: (_t, prop) => (prop === "then" ? undefined : vi.fn()) })
+);
 
 const mockNavigate = vi.fn();
 vi.mock("react-router-dom", async () => ({
@@ -156,7 +167,7 @@ describe("AC-2: AppErrorBoundary — 하위 컴포넌트 예외 복구", () => {
     throw new Error("boom");
   };
 
-  let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
+  let consoleErrorSpy: { mockRestore: () => void };
 
   beforeEach(() => {
     mockNavigate.mockClear();
