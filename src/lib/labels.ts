@@ -15,8 +15,8 @@ export const RELATION_LABELS: Record<string, string> = {
 };
 
 export const REGION_OPTIONS: Array<{ value: string; label: string }> = [
-  { value: "metro", label: "수도권" },
-  { value: "region", label: "지방" },
+  { value: "metro", label: "수도권(서울·경기·인천)" },
+  { value: "region", label: "지방(그 외 지역)" },
 ];
 
 export const ATTENDANCE_OPTIONS: Array<{ value: string; label: string }> = [

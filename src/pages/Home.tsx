@@ -104,7 +104,7 @@ export default function Home() {
           title={<Top.TitleParagraph>축의금, 얼마가 적당할까</Top.TitleParagraph>}
           subtitleBottom={
             <Paragraph.Text typography="t6" color={adaptive.grey600}>
-              자리와 관계를 고르면 요즘 시세에 맞는 금액대를 알려드려요.
+              결혼식·돌잔치·생일·환갑칠순 자리와 관계를 고르면 요즘 시세에 맞는 금액대를 알려드려요.
             </Paragraph.Text>
           }
         />
