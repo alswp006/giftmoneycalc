@@ -58,12 +58,15 @@ export function snapToLadder(raw: number): number {
 export function safeCalculate(partial: Partial<CalcInput>): CalcResult | null {
   const input = normalizeCalcInput(partial);
 
+  if (!Object.prototype.hasOwnProperty.call(BASE_TABLE, input.eventType)) return null;
   const row = BASE_TABLE[input.eventType];
-  if (!row) return null;
+  if (typeof row !== "object" || row === null) return null;
+  if (!Object.prototype.hasOwnProperty.call(row, input.relation)) return null;
   const base = row[input.relation];
-  if (base == null) return null;
+  if (typeof base !== "number" || !Number.isFinite(base)) return null;
 
-  const venueEligible = input.eventType === "wedding" && input.attendance === "attend" && !!input.venue;
+  const venueEligible =
+    input.eventType === "wedding" && input.attendance === "attend" && input.venue === "hotel";
   const adjusted = venueEligible ? base + HOTEL_VENUE_BONUS : base;
 
   const idx = snapToLadderIndex(adjusted);

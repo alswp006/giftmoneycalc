@@ -1,4 +1,6 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
+import { normalizeCalcInput, safeCalculate } from "../lib/calc";
+import type { CalcInput } from "../types/calc";
 
 /**
  * 계산 코어 입력 정규화 및 안전 가드 (Packet: heal-1-01)
@@ -9,25 +11,6 @@ import { describe, it, expect, beforeEach } from "vitest";
  * AC-4: wedding+attend가 아닌 조합에서 venue가 들어와도 hotel 가산 30000이 적용되지 않는다
  * AC-5: 계산 모듈 전체에 undefined 가능성이 있는 `.length` 직접 접근이 없다
  */
-
-// =============================================================================
-// Test Type Definitions (based on expected implementation)
-// =============================================================================
-
-interface CalcInput {
-  eventType: string;
-  relation: string;
-  intimacy: number;
-  region: string;
-  attendance: string;
-  venue?: string | null;
-}
-
-interface CalcResult {
-  recommended: number;
-  rangeMin: number;
-  rangeMax: number;
-}
 
 // =============================================================================
 // AC-1: SPEC 검증 예시 A/B/C/D 불변성
@@ -46,12 +29,11 @@ describe("AC-1: SPEC validation examples preserve existing values", () => {
       venue: "hotel",
     };
 
-    // NOTE: This test will import safeCalculate when it's implemented
-    // const result = safeCalculate(input);
-    // expect(result).not.toBeNull();
-    // expect(result!.recommended).toBe(100000);
-    // expect(result!.rangeMin).toBe(80000);
-    // expect(result!.rangeMax).toBe(120000);
+    const result = safeCalculate(input);
+    expect(result).not.toBeNull();
+    expect(result!.recommended).toBe(100000);
+    expect(result!.rangeMin).toBe(80000);
+    expect(result!.rangeMax).toBe(120000);
   });
 
   it("should calculate consistent results for spec example B", () => {
@@ -66,11 +48,11 @@ describe("AC-1: SPEC validation examples preserve existing values", () => {
       venue: null,
     };
 
-    // const result = safeCalculate(input);
-    // expect(result).not.toBeNull();
-    // expect(result!.recommended).toBe(50000);
-    // expect(result!.rangeMin).toBe(40000);
-    // expect(result!.rangeMax).toBe(70000);
+    const result = safeCalculate(input);
+    expect(result).not.toBeNull();
+    expect(result!.recommended).toBe(50000);
+    expect(result!.rangeMin).toBe(40000);
+    expect(result!.rangeMax).toBe(70000);
   });
 
   it("should calculate consistent results for spec example C", () => {
@@ -85,11 +67,11 @@ describe("AC-1: SPEC validation examples preserve existing values", () => {
       venue: null,
     };
 
-    // const result = safeCalculate(input);
-    // expect(result).not.toBeNull();
-    // expect(result!.recommended).toBe(30000);
-    // expect(result!.rangeMin).toBe(20000);
-    // expect(result!.rangeMax).toBe(40000);
+    const result = safeCalculate(input);
+    expect(result).not.toBeNull();
+    expect(result!.recommended).toBe(30000);
+    expect(result!.rangeMin).toBe(20000);
+    expect(result!.rangeMax).toBe(40000);
   });
 
   it("should calculate consistent results for spec example D", () => {
@@ -104,11 +86,11 @@ describe("AC-1: SPEC validation examples preserve existing values", () => {
       venue: null,
     };
 
-    // const result = safeCalculate(input);
-    // expect(result).not.toBeNull();
-    // expect(result!.recommended).toBe(200000);
-    // expect(result!.rangeMin).toBe(150000);
-    // expect(result!.rangeMax).toBe(250000);
+    const result = safeCalculate(input);
+    expect(result).not.toBeNull();
+    expect(result!.recommended).toBe(200000);
+    expect(result!.rangeMin).toBe(150000);
+    expect(result!.rangeMax).toBe(250000);
   });
 });
 
@@ -126,8 +108,8 @@ describe("AC-2: safely handle undefined, empty, or unknown eventType/relation", 
       attendance: "attend",
     };
 
-    // const result = safeCalculate(normalizeCalcInput(input));
-    // expect(result).toBeNull();
+    const result = safeCalculate(normalizeCalcInput(input));
+    expect(result).toBeNull();
   });
 
   it("should return null when relation is undefined", () => {
@@ -139,8 +121,8 @@ describe("AC-2: safely handle undefined, empty, or unknown eventType/relation", 
       attendance: "attend",
     };
 
-    // const result = safeCalculate(normalizeCalcInput(input));
-    // expect(result).toBeNull();
+    const result = safeCalculate(normalizeCalcInput(input));
+    expect(result).toBeNull();
   });
 
   it("should return null when eventType is empty string", () => {
@@ -152,8 +134,8 @@ describe("AC-2: safely handle undefined, empty, or unknown eventType/relation", 
       attendance: "attend",
     };
 
-    // const result = safeCalculate(normalizeCalcInput(input));
-    // expect(result).toBeNull();
+    const result = safeCalculate(normalizeCalcInput(input));
+    expect(result).toBeNull();
   });
 
   it("should return null when relation is empty string", () => {
@@ -165,8 +147,8 @@ describe("AC-2: safely handle undefined, empty, or unknown eventType/relation", 
       attendance: "attend",
     };
 
-    // const result = safeCalculate(normalizeCalcInput(input));
-    // expect(result).toBeNull();
+    const result = safeCalculate(normalizeCalcInput(input));
+    expect(result).toBeNull();
   });
 
   it("should return null when eventType is not in BASE_TABLE", () => {
@@ -178,8 +160,8 @@ describe("AC-2: safely handle undefined, empty, or unknown eventType/relation", 
       attendance: "attend",
     };
 
-    // const result = safeCalculate(normalizeCalcInput(input));
-    // expect(result).toBeNull();
+    const result = safeCalculate(normalizeCalcInput(input));
+    expect(result).toBeNull();
   });
 
   it("should return null when relation is not in BASE_TABLE[eventType]", () => {
@@ -191,8 +173,8 @@ describe("AC-2: safely handle undefined, empty, or unknown eventType/relation", 
       attendance: "attend",
     };
 
-    // const result = safeCalculate(normalizeCalcInput(input));
-    // expect(result).toBeNull();
+    const result = safeCalculate(normalizeCalcInput(input));
+    expect(result).toBeNull();
   });
 
   it("should not throw exception for invalid inputs - graceful null return", () => {
@@ -203,12 +185,12 @@ describe("AC-2: safely handle undefined, empty, or unknown eventType/relation", 
       { eventType: "wedding", relation: null as any },
     ];
 
-    // invalidInputs.forEach((input) => {
-    //   expect(() => {
-    //     const result = safeCalculate(normalizeCalcInput(input));
-    //     expect(result).toBeNull();
-    //   }).not.toThrow();
-    // });
+    invalidInputs.forEach((input) => {
+      expect(() => {
+        const result = safeCalculate(normalizeCalcInput(input));
+        expect(result).toBeNull();
+      }).not.toThrow();
+    });
   });
 });
 
@@ -226,9 +208,9 @@ describe("AC-3: normalize intimacy with clamping and default handling", () => {
       attendance: "attend",
     };
 
-    // const normalized = normalizeCalcInput(input);
-    // expect(normalized.intimacy).toBe(1);
-    // expect(() => safeCalculate(normalized)).not.toThrow();
+    const normalized = normalizeCalcInput(input);
+    expect(normalized.intimacy).toBe(1);
+    expect(() => safeCalculate(normalized)).not.toThrow();
   });
 
   it("should clamp intimacy 6 to 5", () => {
@@ -240,9 +222,9 @@ describe("AC-3: normalize intimacy with clamping and default handling", () => {
       attendance: "attend",
     };
 
-    // const normalized = normalizeCalcInput(input);
-    // expect(normalized.intimacy).toBe(5);
-    // expect(() => safeCalculate(normalized)).not.toThrow();
+    const normalized = normalizeCalcInput(input);
+    expect(normalized.intimacy).toBe(5);
+    expect(() => safeCalculate(normalized)).not.toThrow();
   });
 
   it("should clamp intimacy 10 to 5", () => {
@@ -254,8 +236,8 @@ describe("AC-3: normalize intimacy with clamping and default handling", () => {
       attendance: "attend",
     };
 
-    // const normalized = normalizeCalcInput(input);
-    // expect(normalized.intimacy).toBe(5);
+    const normalized = normalizeCalcInput(input);
+    expect(normalized.intimacy).toBe(5);
   });
 
   it("should handle NaN intimacy and default to 3", () => {
@@ -267,9 +249,9 @@ describe("AC-3: normalize intimacy with clamping and default handling", () => {
       attendance: "attend",
     };
 
-    // const normalized = normalizeCalcInput(input);
-    // expect(normalized.intimacy).toBe(3);
-    // expect(() => safeCalculate(normalized)).not.toThrow();
+    const normalized = normalizeCalcInput(input);
+    expect(normalized.intimacy).toBe(3);
+    expect(() => safeCalculate(normalized)).not.toThrow();
   });
 
   it("should handle undefined intimacy and default to 3", () => {
@@ -281,9 +263,9 @@ describe("AC-3: normalize intimacy with clamping and default handling", () => {
       attendance: "attend",
     };
 
-    // const normalized = normalizeCalcInput(input);
-    // expect(normalized.intimacy).toBe(3);
-    // expect(() => safeCalculate(normalized)).not.toThrow();
+    const normalized = normalizeCalcInput(input);
+    expect(normalized.intimacy).toBe(3);
+    expect(() => safeCalculate(normalized)).not.toThrow();
   });
 
   it("should preserve valid intimacy values 1-5", () => {
@@ -296,8 +278,8 @@ describe("AC-3: normalize intimacy with clamping and default handling", () => {
         attendance: "attend",
       };
 
-      // const normalized = normalizeCalcInput(input);
-      // expect(normalized.intimacy).toBe(value);
+      const normalized = normalizeCalcInput(input);
+      expect(normalized.intimacy).toBe(value);
     });
   });
 });
@@ -326,11 +308,11 @@ describe("AC-4: venue logic - hotel 30000 only applies for wedding+attend", () =
       venue: null,
     };
 
-    // const resultWith = safeCalculate(withVenue);
-    // const resultWithout = safeCalculate(withoutVenue);
-    // expect(resultWith).not.toBeNull();
-    // expect(resultWithout).not.toBeNull();
-    // expect(resultWith!.recommended).toBe(resultWithout!.recommended + 30000);
+    const resultWith = safeCalculate(withVenue);
+    const resultWithout = safeCalculate(withoutVenue);
+    expect(resultWith).not.toBeNull();
+    expect(resultWithout).not.toBeNull();
+    expect(resultWith!.recommended).toBe(resultWithout!.recommended + 30000);
   });
 
   it("should NOT apply hotel venue bonus for wedding+host (not attend)", () => {
@@ -352,11 +334,11 @@ describe("AC-4: venue logic - hotel 30000 only applies for wedding+attend", () =
       venue: null,
     };
 
-    // const resultWith = safeCalculate(hostWithVenue);
-    // const resultWithout = safeCalculate(hostWithoutVenue);
-    // expect(resultWith).not.toBeNull();
-    // expect(resultWithout).not.toBeNull();
-    // expect(resultWith!.recommended).toBe(resultWithout!.recommended);
+    const resultWith = safeCalculate(hostWithVenue);
+    const resultWithout = safeCalculate(hostWithoutVenue);
+    expect(resultWith).not.toBeNull();
+    expect(resultWithout).not.toBeNull();
+    expect(resultWith!.recommended).toBe(resultWithout!.recommended);
   });
 
   it("should NOT apply hotel venue bonus for non-wedding+attend", () => {
@@ -378,11 +360,37 @@ describe("AC-4: venue logic - hotel 30000 only applies for wedding+attend", () =
       venue: null,
     };
 
-    // const resultWith = safeCalculate(birthdayAttendWithVenue);
-    // const resultWithout = safeCalculate(birthdayAttendWithoutVenue);
-    // expect(resultWith).not.toBeNull();
-    // expect(resultWithout).not.toBeNull();
-    // expect(resultWith!.recommended).toBe(resultWithout!.recommended);
+    const resultWith = safeCalculate(birthdayAttendWithVenue);
+    const resultWithout = safeCalculate(birthdayAttendWithoutVenue);
+    expect(resultWith).not.toBeNull();
+    expect(resultWithout).not.toBeNull();
+    expect(resultWith!.recommended).toBe(resultWithout!.recommended);
+  });
+
+  it("should NOT apply hotel venue bonus for a non-hotel venue value", () => {
+    const generalVenue: CalcInput = {
+      eventType: "wedding",
+      relation: "friend",
+      intimacy: 3,
+      region: "metro",
+      attendance: "attend",
+      venue: "general",
+    };
+
+    const noVenue: CalcInput = {
+      eventType: "wedding",
+      relation: "friend",
+      intimacy: 3,
+      region: "metro",
+      attendance: "attend",
+      venue: null,
+    };
+
+    const resultGeneral = safeCalculate(generalVenue);
+    const resultNone = safeCalculate(noVenue);
+    expect(resultGeneral).not.toBeNull();
+    expect(resultNone).not.toBeNull();
+    expect(resultGeneral!.recommended).toBe(resultNone!.recommended);
   });
 
   it("should normalize venue to null when conditions not met", () => {
@@ -405,10 +413,10 @@ describe("AC-4: venue logic - hotel 30000 only applies for wedding+attend", () =
       },
     ];
 
-    // inputs.forEach((input) => {
-    //   const normalized = normalizeCalcInput(input);
-    //   expect(normalized.venue).toBeNull();
-    // });
+    inputs.forEach((input) => {
+      const normalized = normalizeCalcInput(input);
+      expect(normalized.venue).toBeNull();
+    });
   });
 });
 
@@ -417,61 +425,48 @@ describe("AC-4: venue logic - hotel 30000 only applies for wedding+attend", () =
 // =============================================================================
 
 describe("AC-5: no unsafe .length access on arrays", () => {
-  it("should safely handle snapToLadder with NaN raw value", () => {
-    // snapToLadder should use a guarded LADDER constant
-    // const result = snapToLadder(NaN);
-    // Should not crash and return LADDER[0]
-    // expect(result).toBeDefined();
-  });
-
-  it("should safely handle snapToLadder with undefined value", () => {
-    // const result = snapToLadder(undefined as any);
-    // Should not crash and return safe default
-    // expect(result).toBeDefined();
-  });
-
   it("should safely compute rangeMin/rangeMax without index bounds errors", () => {
     // When snapToLadder returns idx=0, rangeMin should use recommended fallback (not idx-1)
-    // const input: CalcInput = {
-    //   eventType: "wedding",
-    //   relation: "friend",
-    //   intimacy: 1,
-    //   region: "metro",
-    //   attendance: "attend",
-    //   venue: null,
-    // };
-    // const result = safeCalculate(input);
-    // expect(result).not.toBeNull();
-    // expect(result!.rangeMin).toBeDefined();
-    // expect(result!.rangeMax).toBeDefined();
+    const input: CalcInput = {
+      eventType: "wedding",
+      relation: "friend",
+      intimacy: 1,
+      region: "metro",
+      attendance: "attend",
+      venue: null,
+    };
+    const result = safeCalculate(input);
+    expect(result).not.toBeNull();
+    expect(result!.rangeMin).toBeDefined();
+    expect(result!.rangeMax).toBeDefined();
   });
 
   it("should not crash when LADDER is at boundary indices", () => {
     // At idx=0 (minimum): rangeMin = recommended, range not negative
     // At idx=LADDER.length-1 (maximum): rangeMax = recommended
-    // const inputs: Partial<CalcInput>[] = [
-    //   {
-    //     eventType: "wedding",
-    //     relation: "friend",
-    //     intimacy: 1,
-    //     region: "metro",
-    //     attendance: "attend",
-    //   },
-    //   {
-    //     eventType: "wedding",
-    //     relation: "friend",
-    //     intimacy: 5,
-    //     region: "metro",
-    //     attendance: "attend",
-    //   },
-    // ];
-    // inputs.forEach((input) => {
-    //   expect(() => {
-    //     const normalized = normalizeCalcInput(input);
-    //     const result = safeCalculate(normalized);
-    //     expect(result).not.toBeNull();
-    //   }).not.toThrow();
-    // });
+    const inputs: Partial<CalcInput>[] = [
+      {
+        eventType: "wedding",
+        relation: "friend",
+        intimacy: 1,
+        region: "metro",
+        attendance: "attend",
+      },
+      {
+        eventType: "wedding",
+        relation: "friend",
+        intimacy: 5,
+        region: "metro",
+        attendance: "attend",
+      },
+    ];
+    inputs.forEach((input) => {
+      expect(() => {
+        const normalized = normalizeCalcInput(input);
+        const result = safeCalculate(normalized);
+        expect(result).not.toBeNull();
+      }).not.toThrow();
+    });
   });
 });
 
@@ -486,11 +481,11 @@ describe("normalizeCalcInput - default values and composition", () => {
       relation: "friend",
     };
 
-    // const normalized = normalizeCalcInput(input);
-    // expect(normalized.intimacy).toBe(3);
-    // expect(normalized.region).toBe("metro");
-    // expect(normalized.attendance).toBe("attend");
-    // expect(normalized.venue).toBeNull();
+    const normalized = normalizeCalcInput(input);
+    expect(normalized.intimacy).toBe(3);
+    expect(normalized.region).toBe("metro");
+    expect(normalized.attendance).toBe("attend");
+    expect(normalized.venue).toBeNull();
   });
 
   it("should preserve explicit values and only fill missing fields", () => {
@@ -503,13 +498,14 @@ describe("normalizeCalcInput - default values and composition", () => {
       venue: "hotel",
     };
 
-    // const normalized = normalizeCalcInput(input);
-    // expect(normalized.eventType).toBe("wedding");
-    // expect(normalized.relation).toBe("friend");
-    // expect(normalized.intimacy).toBe(5);
-    // expect(normalized.region).toBe("region");
-    // expect(normalized.attendance).toBe("host");
-    // expect(normalized.venue).toBe("hotel");
+    const normalized = normalizeCalcInput(input);
+    expect(normalized.eventType).toBe("wedding");
+    expect(normalized.relation).toBe("friend");
+    expect(normalized.intimacy).toBe(5);
+    expect(normalized.region).toBe("region");
+    expect(normalized.attendance).toBe("host");
+    // venue is only preserved when eligible (wedding + attend); "host" clears it
+    expect(normalized.venue).toBeNull();
   });
 });
 
@@ -524,15 +520,15 @@ describe("safeCalculate - comprehensive end-to-end", () => {
       venue: null,
     };
 
-    // const result = safeCalculate(input);
-    // expect(result).not.toBeNull();
-    // if (result) {
-    //   expect(typeof result.recommended).toBe("number");
-    //   expect(typeof result.rangeMin).toBe("number");
-    //   expect(typeof result.rangeMax).toBe("number");
-    //   expect(result.rangeMin <= result.recommended).toBe(true);
-    //   expect(result.recommended <= result.rangeMax).toBe(true);
-    // }
+    const result = safeCalculate(input);
+    expect(result).not.toBeNull();
+    if (result) {
+      expect(typeof result.recommended).toBe("number");
+      expect(typeof result.rangeMin).toBe("number");
+      expect(typeof result.rangeMax).toBe("number");
+      expect(result.rangeMin <= result.recommended).toBe(true);
+      expect(result.recommended <= result.rangeMax).toBe(true);
+    }
   });
 
   it("should return null for invalid input (error path)", () => {
@@ -544,7 +540,12 @@ describe("safeCalculate - comprehensive end-to-end", () => {
       attendance: "attend",
     };
 
-    // const result = safeCalculate(normalizeCalcInput(input));
-    // expect(result).toBeNull();
+    const result = safeCalculate(normalizeCalcInput(input));
+    expect(result).toBeNull();
+  });
+
+  it("should not resolve to a base amount via inherited Object.prototype keys", () => {
+    const result = safeCalculate({ eventType: "constructor", relation: "toString" });
+    expect(result).toBeNull();
   });
 });

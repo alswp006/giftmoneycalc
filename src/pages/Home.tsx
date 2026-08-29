@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button, Paragraph, Spacing, Top } from "@toss/tds-mobile";
 import { adaptive } from "@toss/tds-colors";
@@ -63,6 +63,19 @@ export default function Home() {
 
   const showVenue = eventType === "wedding" && attendance === "attend";
   const canSubmit = eventType !== "" && relation !== "";
+
+  // @AI:NOTE 제출 전 화면 이동(예: 기록 보기)에도 선택이 사라지지 않도록 값이 바뀔 때마다 초안을 저장한다.
+  useEffect(() => {
+    const input: CalcInput = {
+      eventType,
+      relation,
+      intimacy,
+      region,
+      attendance,
+      venue: showVenue && venue !== "" ? venue : null,
+    };
+    setItem(DRAFT_STORAGE_KEY, JSON.stringify(input));
+  }, [eventType, relation, intimacy, region, attendance, venue, showVenue]);
 
   const handleEventType = (value: string) => {
     setEventType(value);

@@ -1,0 +1,9 @@
+{
+  "app_id": "fac_giftmoneycalc_c8ra",
+  "name": "GiftMoneyCalc",
+  "base_url_env": "FAC_GIFTMONEYCALC_C8RA_BASE_URL",
+  "profile": "experimental",
+  "level": "smoke",
+  "created_by": "factory",
+  "created_at": "2026-08-30"
+}

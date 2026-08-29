@@ -13,5 +13,7 @@ export default defineConfig({
   test: {
     globals: true,
     setupFiles: ["./src/setupTests.ts"],
+    // .ai-factory/qa-pack은 Playwright 시나리오(별도 러너)라 vitest 대상에서 제외한다.
+    exclude: ["**/node_modules/**", "**/dist/**", ".ai-factory/**"],
   },
 });
