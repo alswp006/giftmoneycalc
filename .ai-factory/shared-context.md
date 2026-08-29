@@ -3,21 +3,71 @@
 
 ## Existing Codebase (import and use these — do NOT recreate)
 ### File Tree (src/)
+  App.tsx
+  components/
+    AppErrorBoundary.tsx
+    BottomCTA.tsx
+    Card.tsx
+    ChipGroup.tsx
+    PageShell.tsx
+    ScreenScaffold.tsx
   lib/
+    __tests__/
     calc.ts
     constants.ts
+    labels.ts
+    storage.ts
+  main.tsx
+  pages/
+    HistoryPage.tsx
+    Home.tsx
+    ResultPage.tsx
+  setupTests.ts
   types/
     calc.ts
+  vite-env.d.ts
 
 ### Exports (src/lib/)
 - calc.ts: export function normalizeCalcInput(partial: Partial<CalcInput> | null | undefined): CalcInput; export function snapToLadder(raw: number): number; export function safeCalculate(partial: Partial<CalcInput>): CalcResult | null
 - constants.ts: export const BASE_TABLE: Record<string, Record<string, number>> =; export const LADDER: number[] = [ 10000, 20000, 30000, 40000, 50000, 70000, 80000, 100000, 120000, 150000, 200000, 25000; export const HOTEL_VENUE_BONUS = 30000; export const DEFAULT_INTIMACY = 3; export const DEFAULT_REGION = "metro"; export const DEFAULT_ATTENDANCE = "attend"; export const MIN_INTIMACY = 1; export const MAX_INTIMACY = 5
+- labels.ts: export const EVENT_LABELS: Record<string, string> =; export const RELATION_LABELS: Record<string, string> =; export const REGION_OPTIONS: Array<; export const ATTENDANCE_OPTIONS: Array<; export const VENUE_OPTIONS: Array<; export const INTIMACY_LABELS: Record<number, string> =; export function formatWon(amount: number): string; export function eventLabel(value?: string): string
+- storage.ts: export const HISTORY_STORAGE_KEY = "giftmoney.history"; export function getItem(key: string): string | null; export function setItem(key: string, value: string): void; export function removeItem(key: string): void; export function getHistoryList(): HistoryItem[]; export function addHistoryItem(item: HistoryItem): HistoryItem[]; export function clearHistory(): void
+
+### Components (src/components/)
+- BottomCTA.tsx: SubmitFooter, ButtonStack
+- Card.tsx: Card
+- ChipGroup.tsx: ChipGroup
+- PageShell.tsx: PageShell
+- ScreenScaffold.tsx: ScreenScaffold
 CRITICAL: Before creating any new function, type, or component, check the list above. If something similar exists, import and use it.
 
 ## Already Implemented (do NOT duplicate or overwrite)
 - heal-1-01: 계산 코어 입력 정규화 및 안전 가드 (files: src/lib/calc.ts, src/lib/constants.ts, src/types/calc.ts)
+- heal-1-03: 에러 경로 회귀 테스트 및 전역 에러 바운더리 (files: src/lib/__tests__/calc.error.test.ts, src/components/AppErrorBoundary.tsx, src/App.tsx)
 
 ## Available exports from existing files
+// src/App.tsx
+export default function App() {
+
+// src/components/AppErrorBoundary.tsx
+export default class AppErrorBoundary extends Component<
+
+// src/components/BottomCTA.tsx
+export function SubmitFooter({ label, onClick, disabled = false }: SubmitFooterProps) {
+export function ButtonStack({
+
+// src/components/Card.tsx
+export default function Card({ children, testId }: CardProps) {
+
+// src/components/ChipGroup.tsx
+export default function ChipGroup({ title, options, selected, onSelect }: ChipGroupProps) {
+
+// src/components/PageShell.tsx
+export default function PageShell({ children, bottomInset = 0 }: PageShellProps) {
+
+// src/components/ScreenScaffold.tsx
+export default function ScreenScaffold({ top, bottom, children }: ScreenScaffoldProps) {
+
 // src/lib/calc.ts
 export function normalizeCalcInput(partial: Partial<CalcInput> | null | undefined): CalcInput {
 export function snapToLadder(raw: number): number {
@@ -33,9 +83,20 @@ export const DEFAULT_ATTENDANCE = "attend";
 export const MIN_INTIMACY = 1;
 export const MAX_INTIMACY = 5;
 
+// src/lib/labels.ts
+export const EVENT_LABELS: Record<string, string> = {
+export const RELATION_LABELS: Record<string, string> = {
+export const REGION_OPTIONS: Array<{ value: string; label: string }> = [
+export const ATTENDANCE_OPTIONS: Array<{ value: string; label: string }> = [
+export const VENUE_OPTIONS: Array<{ value: string; label: string }> = [
+export const INTIMACY_LABELS: Record<number, string> = {
+export function formatWon(amount: number): string {
+export function eventLabel(value?: string): string {
+export function relationLabel(value?: string): string {
+
 // src/types/calc.ts
 export interface CalcInput {
-export interface CalcResult {
+export interface CalcResul
 
 ## Memory Index (자동 학습 — 힌트로만 사용, 실제 코드 확인 필수)
 
