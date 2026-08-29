@@ -5,6 +5,7 @@ import { adaptive } from "@toss/tds-colors";
 import ScreenScaffold from "../components/ScreenScaffold";
 import ChipGroup from "../components/ChipGroup";
 import { SubmitFooter } from "../components/BottomCTA";
+import { normalizeCalcInput } from "../lib/calc";
 import { BASE_TABLE, DEFAULT_ATTENDANCE, DEFAULT_INTIMACY, DEFAULT_REGION } from "../lib/constants";
 import {
   ATTENDANCE_OPTIONS,
@@ -25,7 +26,9 @@ function readDraft(): Partial<CalcInput> {
   if (raw == null) return {};
   try {
     const parsed: unknown = JSON.parse(raw);
-    return typeof parsed === "object" && parsed !== null ? (parsed as Partial<CalcInput>) : {};
+    if (typeof parsed !== "object" || parsed === null) return {};
+    // @AI:NOTE 손상되거나 이전 포맷의 초안이어도 타입이 어긋난 채 state로 들어가지 않게 정규화한다.
+    return normalizeCalcInput(parsed as Partial<CalcInput>);
   } catch {
     return {};
   }
