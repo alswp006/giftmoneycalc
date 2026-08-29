@@ -23,12 +23,13 @@ export default function ChipGroup({ title, options, selected, onSelect }: ChipGr
         {title}
       </Paragraph.Text>
       <Spacing size={8} />
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+      <div role="group" aria-label={title} style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
         {options.map((option) => (
           <Button
             key={option.value}
             size="medium"
             variant={selected === option.value ? "fill" : "weak"}
+            aria-pressed={selected === option.value}
             onClick={() => onSelect(option.value)}
           >
             {option.label}
